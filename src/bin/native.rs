@@ -15,12 +15,16 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
     style::{Color, Modifier},
 };
-use tui_kanban::{app::App, tasklists_dir, ui};
+use tui_kanban::{app::App, model::DEFAULT_NATIVE_FONT_SIZE, tasklists_dir, ui};
 
 const BACKGROUND: Color32 = Color32::from_rgb(13, 15, 24);
 const DEFAULT_TEXT: Color32 = Color32::from_rgb(221, 224, 235);
-// A denser terminal grid gives the native window the detail of a modern
-// high-resolution terminal rather than the enlarged 100×28 prototype grid.
+const STARTUP_COLUMNS: f32 = 35.0;
+const STARTUP_ROWS: f32 = 100.0;
+// These values match the default 16 pt bundled font metrics at 100% display
+// scaling, so the native window opens as a 35-column by 100-row grid.
+const DEFAULT_CELL_WIDTH: f32 = 8.4;
+const DEFAULT_CELL_HEIGHT: f32 = 17.0;
 const FRAME_TIME: Duration = Duration::from_millis(33);
 const REGULAR_FONT: &str = "ubuntu-mono-nerd-regular";
 const BOLD_FONT: &str = "ubuntu-mono-nerd-bold";
@@ -28,13 +32,21 @@ const BOLD_FONT: &str = "ubuntu-mono-nerd-bold";
 fn main() -> Result<()> {
     let mut app = App::load(tasklists_dir()?)?;
     app.disable_terminal_bell();
+    let startup_font_scale = app.config.native_font_size as f32 / DEFAULT_NATIVE_FONT_SIZE as f32;
+    let startup_cell_width = DEFAULT_CELL_WIDTH * startup_font_scale;
+    let startup_cell_height = DEFAULT_CELL_HEIGHT * startup_font_scale;
     let native_app = NativeApp::new(app)?;
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
-            // Approximately 171×47 cells at 100% display scaling.
-            .with_inner_size([1_440.0, 810.0])
-            .with_min_inner_size([420.0, 255.0])
+            .with_inner_size([
+                STARTUP_COLUMNS * startup_cell_width,
+                STARTUP_ROWS * startup_cell_height,
+            ])
+            .with_min_inner_size([STARTUP_COLUMNS * startup_cell_width, 255.0])
             .with_resizable(true),
+        // A previous manual resize would otherwise override the requested
+        // startup grid on the next launch.
+        persist_window: false,
         ..Default::default()
     };
     eframe::run_native(
@@ -187,17 +199,19 @@ impl eframe::App for NativeApp {
         self.app.tick(now);
         self.handle_input(&ctx, now);
 
-        egui::CentralPanel::default().show(root_ui, |ui| {
-            let area = ui.max_rect();
-            ui.painter().rect_filled(area, 0.0, BACKGROUND);
-            if let Some(error) = &self.fatal_error {
-                ui.centered_and_justified(|ui| {
-                    ui.colored_label(Color32::from_rgb(244, 112, 122), error);
-                });
-            } else {
-                self.render(&ctx, ui, area);
-            }
-        });
+        egui::CentralPanel::default()
+            .frame(egui::Frame::NONE)
+            .show(root_ui, |ui| {
+                let area = ui.max_rect();
+                ui.painter().rect_filled(area, 0.0, BACKGROUND);
+                if let Some(error) = &self.fatal_error {
+                    ui.centered_and_justified(|ui| {
+                        ui.colored_label(Color32::from_rgb(244, 112, 122), error);
+                    });
+                } else {
+                    self.render(&ctx, ui, area);
+                }
+            });
 
         if self.app.should_quit {
             ctx.send_viewport_cmd(egui::ViewportCommand::Close);

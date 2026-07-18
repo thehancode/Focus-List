@@ -1,3 +1,4 @@
+use chrono::{Datelike, Local, NaiveDate};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Margin, Rect},
@@ -5,7 +6,6 @@ use ratatui::{
     text::{Line, Span, Text},
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
 };
-use chrono::{Datelike, Local, NaiveDate};
 use std::collections::HashSet;
 
 use crate::{
@@ -27,7 +27,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
     frame.render_widget(Block::new().style(Style::new().bg(BG)), area);
 
-    if area.width < 50 || area.height < 12 {
+    if area.width < 30 || area.height < 20 {
         render_too_small(frame, area);
         return;
     }
@@ -199,9 +199,7 @@ fn render_list(frame: &mut Frame, app: &App, area: Rect) {
             lines.extend(
                 tasks
                     .into_iter()
-                    .flat_map(|task| {
-                        task_lines(app, task, inner.width.saturating_sub(3) as usize)
-                    }),
+                    .flat_map(|task| task_lines(app, task, inner.width.saturating_sub(3) as usize)),
             );
         }
         lines.push(Line::raw(""));
@@ -237,7 +235,10 @@ fn render_focus(frame: &mut Frame, app: &App, area: Rect) {
         .filter(|task| task.status == Status::Doing)
         .collect();
     let lines: Vec<Line> = if tasks.is_empty() {
-        vec![Line::styled("  · no doing tasks ·", Style::new().fg(MUTED).italic())]
+        vec![Line::styled(
+            "  · no doing tasks ·",
+            Style::new().fg(MUTED).italic(),
+        )]
     } else {
         tasks
             .into_iter()
@@ -391,7 +392,10 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
             Style::new().fg(status_color(animation.to)).bold(),
         )
     } else if app.chord_started.is_some() {
-        Line::styled(" SPACE armed — F advance, ↑↓ reorder ", Style::new().fg(AMBER).bold())
+        Line::styled(
+            " SPACE armed — F advance, ↑↓ reorder ",
+            Style::new().fg(AMBER).bold(),
+        )
     } else {
         Line::styled("", Style::default())
     };
@@ -499,8 +503,8 @@ fn render_prompt(
             " Enter save   Tab daily: {}   Esc cancel",
             if daily { "yes" } else { "no" }
         ))
-            .wrap(Wrap { trim: true })
-            .style(Style::new().fg(MUTED)),
+        .wrap(Wrap { trim: true })
+        .style(Style::new().fg(MUTED)),
         layout[1],
     );
 }
@@ -513,18 +517,27 @@ fn render_settings(frame: &mut Frame, app: &App, selected: usize, area: Rect) {
     frame.render_widget(block, popup);
     let selected_style = Style::new().fg(BG).bg(VIOLET).bold();
     let normal_style = Style::new().fg(TEXT);
-    let speed_style = if selected == 0 { selected_style } else { normal_style };
-    let display_style = if selected == 1 { selected_style } else { normal_style };
-    let font_size_style = if selected == 2 { selected_style } else { normal_style };
+    let speed_style = if selected == 0 {
+        selected_style
+    } else {
+        normal_style
+    };
+    let display_style = if selected == 1 {
+        selected_style
+    } else {
+        normal_style
+    };
+    let font_size_style = if selected == 2 {
+        selected_style
+    } else {
+        normal_style
+    };
     let text = Text::from(vec![
         Line::styled(" Use ←/→ or h/l to adjust values", Style::new().fg(MUTED)),
         Line::raw(""),
         Line::from(vec![
             Span::styled(" Marquee speed ", speed_style),
-            Span::styled(
-                format!("{} ms", app.config.marquee_speed_ms),
-                speed_style,
-            ),
+            Span::styled(format!("{} ms", app.config.marquee_speed_ms), speed_style),
         ]),
         Line::from(vec![
             Span::styled(" Long titles  ", display_style),
@@ -532,10 +545,16 @@ fn render_settings(frame: &mut Frame, app: &App, selected: usize, area: Rect) {
         ]),
         Line::from(vec![
             Span::styled(" Native font  ", font_size_style),
-            Span::styled(format!("{} pt", app.config.native_font_size), font_size_style),
+            Span::styled(
+                format!("{} pt", app.config.native_font_size),
+                font_size_style,
+            ),
         ]),
         Line::raw(""),
-        Line::styled(" Lower speed is faster. Font size affects the native app.", Style::new().fg(MUTED)),
+        Line::styled(
+            " Lower speed is faster. Font size affects the native app.",
+            Style::new().fg(MUTED),
+        ),
         Line::styled(" Esc or g close", Style::new().fg(MUTED)),
     ]);
     frame.render_widget(Paragraph::new(text).style(Style::new().bg(PANEL)), inner);
@@ -543,7 +562,12 @@ fn render_settings(frame: &mut Frame, app: &App, selected: usize, area: Rect) {
 
 #[allow(dead_code)]
 fn render_activity(frame: &mut Frame, app: &App, task_id: uuid::Uuid, area: Rect) {
-    let Some(task) = app.current_list().tasks.iter().find(|task| task.id == task_id) else {
+    let Some(task) = app
+        .current_list()
+        .tasks
+        .iter()
+        .find(|task| task.id == task_id)
+    else {
         return;
     };
     let popup = centered(area, 78, 66, 64, 18);
@@ -587,7 +611,10 @@ fn render_month_activity(frame: &mut Frame, task: &Task, year: i32, month: u32, 
     .expect("valid next month");
     let days = (next_month - first).num_days() as u32;
     let mut lines = vec![
-        Line::styled(first.format(" %B %Y").to_string(), Style::new().fg(VIOLET).bold()),
+        Line::styled(
+            first.format(" %B %Y").to_string(),
+            Style::new().fg(VIOLET).bold(),
+        ),
         Line::styled(" S  M  T  W  T  F  S", Style::new().fg(MUTED)),
     ];
     let mut cells = vec![None; first.weekday().num_days_from_sunday() as usize];
@@ -633,7 +660,7 @@ fn render_confirm(frame: &mut Frame, area: Rect) {
 
 fn render_too_small(frame: &mut Frame, area: Rect) {
     frame.render_widget(
-        Paragraph::new("KANBAN\n\nTerminal too small\nResize to at least 50 × 12")
+        Paragraph::new("KANBAN\n\nTerminal too small\nResize to at least 30 × 20")
             .alignment(Alignment::Center)
             .style(Style::new().fg(VIOLET).bg(BG).bold()),
         area,
@@ -856,10 +883,7 @@ mod tests {
 
     #[test]
     fn wrapped_titles_preserve_manual_lines() {
-        assert_eq!(
-            wrap_task_title("abcde\nf", 3),
-            vec!["abc", "de", "f"]
-        );
+        assert_eq!(wrap_task_title("abcde\nf", 3), vec!["abc", "de", "f"]);
     }
 
     #[test]
@@ -873,5 +897,4 @@ mod tests {
         app.current_list_mut().tasks.push(task);
         assert!(daily_activity_line(&app, 40).is_some_and(|line| line.contains('■')));
     }
-
 }

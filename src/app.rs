@@ -10,8 +10,8 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        AppConfig, Status, Task, TaskList, MAX_MARQUEE_SPEED_MS, MAX_NATIVE_FONT_SIZE,
-        MIN_MARQUEE_SPEED_MS, MIN_NATIVE_FONT_SIZE,
+        AppConfig, MAX_MARQUEE_SPEED_MS, MAX_NATIVE_FONT_SIZE, MIN_MARQUEE_SPEED_MS,
+        MIN_NATIVE_FONT_SIZE, Status, Task, TaskList,
     },
     storage::{ConfigStore, TaskStore},
 };
@@ -43,7 +43,9 @@ pub enum Overlay {
         daily: bool,
     },
     ConfirmDelete,
-    Settings { selected: usize },
+    Settings {
+        selected: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -305,12 +307,14 @@ impl App {
         match key.code {
             KeyCode::Esc => self.overlay = Overlay::None,
             KeyCode::Enter => self.save_prompt(kind, input, daily),
-            KeyCode::Tab => self.overlay = Overlay::Prompt {
-                kind,
-                input,
-                cursor,
-                daily: !daily,
-            },
+            KeyCode::Tab => {
+                self.overlay = Overlay::Prompt {
+                    kind,
+                    input,
+                    cursor,
+                    daily: !daily,
+                }
+            }
             KeyCode::Backspace => {
                 if let Some(start) = previous_char_boundary(&input, cursor) {
                     input.drain(start..cursor);
@@ -437,12 +441,16 @@ impl App {
     fn handle_settings(&mut self, key: KeyEvent, selected: usize) {
         match key.code {
             KeyCode::Esc | KeyCode::Char('g') | KeyCode::Char('q') => self.overlay = Overlay::None,
-            KeyCode::Up | KeyCode::Char('k') => self.overlay = Overlay::Settings {
-                selected: selected.saturating_sub(1),
-            },
-            KeyCode::Down | KeyCode::Char('j') => self.overlay = Overlay::Settings {
-                selected: (selected + 1).min(2),
-            },
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.overlay = Overlay::Settings {
+                    selected: selected.saturating_sub(1),
+                }
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                self.overlay = Overlay::Settings {
+                    selected: (selected + 1).min(2),
+                }
+            }
             KeyCode::Left | KeyCode::Char('h') => match selected {
                 0 => self.adjust_marquee_speed(-25),
                 1 => self.toggle_long_title_display(),
@@ -680,7 +688,9 @@ impl App {
             .enumerate()
             .filter_map(|(index, task)| (task.status == status).then_some(index))
             .collect();
-        let Some(current) = positions.iter().position(|index| self.current_list().tasks[*index].id == id)
+        let Some(current) = positions
+            .iter()
+            .position(|index| self.current_list().tasks[*index].id == id)
         else {
             return;
         };
@@ -688,7 +698,9 @@ impl App {
         if target == current {
             return;
         }
-        self.current_list_mut().tasks.swap(positions[current], positions[target]);
+        self.current_list_mut()
+            .tasks
+            .swap(positions[current], positions[target]);
         self.save_current("Task reordered");
     }
 
@@ -703,7 +715,6 @@ impl App {
             .unwrap_or(0);
         self.selected_task = Some(ids[move_index(position, delta, ids.len())]);
     }
-
 }
 
 fn move_index(index: usize, delta: isize, length: usize) -> usize {
@@ -711,7 +722,10 @@ fn move_index(index: usize, delta: isize, length: usize) -> usize {
 }
 
 fn previous_char_boundary(value: &str, cursor: usize) -> Option<usize> {
-    value[..cursor].char_indices().next_back().map(|(index, _)| index)
+    value[..cursor]
+        .char_indices()
+        .next_back()
+        .map(|(index, _)| index)
 }
 
 fn next_char_boundary(value: &str, cursor: usize) -> Option<usize> {
@@ -739,7 +753,8 @@ fn move_cursor_line(value: &str, cursor: usize, direction: isize) -> usize {
         .iter()
         .rposition(|start| *start <= cursor)
         .unwrap_or(0);
-    let target_line = (current_line as isize + direction).clamp(0, starts.len() as isize - 1) as usize;
+    let target_line =
+        (current_line as isize + direction).clamp(0, starts.len() as isize - 1) as usize;
     let column = value[line_start(value, cursor)..cursor].chars().count();
     let target_start = starts[target_line];
     let target_end = line_end(value, target_start);
@@ -1035,7 +1050,10 @@ mod tests {
             now + Duration::from_millis(1),
         );
         assert_eq!(app.config.marquee_speed_ms, initial_speed - 25);
-        assert_eq!(app.config_store.load().unwrap().marquee_speed_ms, initial_speed - 25);
+        assert_eq!(
+            app.config_store.load().unwrap().marquee_speed_ms,
+            initial_speed - 25
+        );
     }
 
     #[test]
@@ -1052,7 +1070,10 @@ mod tests {
             now + Duration::from_millis(2),
         );
         assert_eq!(app.config.long_title_display.label(), "Wrap");
-        assert_eq!(app.config_store.load().unwrap().long_title_display.label(), "Wrap");
+        assert_eq!(
+            app.config_store.load().unwrap().long_title_display.label(),
+            "Wrap"
+        );
     }
 
     #[test]
