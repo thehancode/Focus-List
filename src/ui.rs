@@ -7,6 +7,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap},
 };
 use std::collections::HashSet;
+use uuid::Uuid;
 
 use crate::{
     app::{ANIMATION_DURATION, App, Overlay, PromptKind, ViewMode},
@@ -58,6 +59,90 @@ pub fn render(frame: &mut Frame, app: &App) {
         Overlay::ConfirmDelete => render_confirm(frame, area),
         Overlay::Settings { selected } => render_settings(frame, app, *selected, area),
     }
+}
+
+/// Returns the task occupying a rendered grid cell.
+///
+/// This mirrors the view layout and scrolling used by the renderer, giving
+/// native front ends a resolution-independent hit-test without pixel guesses.
+pub fn task_at(app: &App, area: Rect, column: u16, row: u16) -> Option<Uuid> {
+    if area.width < 30
+        || area.height < 20
+        || column >= area.width
+        || row >= area.height
+        || app.overlay != Overlay::None
+    {
+        return None;
+    }
+
+    let body = Layout::vertical([
+        Constraint::Length(3),
+        Constraint::Min(5),
+        Constraint::Length(2),
+    ])
+    .split(area)[1];
+    let outer = body.inner(Margin::new(1, 0));
+    let inner = Block::new().borders(Borders::ALL).inner(outer);
+    if !inner.contains(ratatui::layout::Position::new(column, row)) {
+        return None;
+    }
+    let visible_row = (row - inner.y) as usize;
+
+    match app.view {
+        ViewMode::List => list_task_at(app, inner, visible_row),
+        ViewMode::Focus => app
+            .current_list()
+            .tasks
+            .iter()
+            .filter(|task| task.status == Status::Doing)
+            .flat_map(|task| {
+                std::iter::repeat_n(
+                    task.id,
+                    task_lines(app, task, inner.width.saturating_sub(3) as usize).len(),
+                )
+            })
+            .nth(visible_row),
+        ViewMode::Completed => {
+            let entries = app.completion_entries();
+            let selected_row = entries
+                .iter()
+                .position(|(task, _)| Some(task.id) == app.selected_task)
+                .unwrap_or(0);
+            let scroll = selected_row.saturating_sub(inner.height.saturating_sub(1) as usize);
+            entries.get(scroll + visible_row).map(|(task, _)| task.id)
+        }
+    }
+}
+
+fn list_task_at(app: &App, inner: Rect, visible_row: usize) -> Option<Uuid> {
+    let mut rows = Vec::new();
+    for status in Status::LIST_ORDER {
+        let tasks: Vec<&Task> = app
+            .current_list()
+            .tasks
+            .iter()
+            .filter(|task| task.status == status)
+            .collect();
+        rows.push(None); // status heading
+        if tasks.is_empty() {
+            rows.push(None); // empty-state message
+        } else {
+            for task in tasks {
+                rows.extend(std::iter::repeat_n(
+                    Some(task.id),
+                    task_lines(app, task, inner.width.saturating_sub(3) as usize).len(),
+                ));
+            }
+        }
+        rows.push(None); // section spacing
+    }
+
+    let selected_line = rows
+        .iter()
+        .position(|id| *id == app.selected_task)
+        .unwrap_or(0);
+    let scroll = selected_line.saturating_sub(inner.height.saturating_sub(1) as usize);
+    rows.get(scroll + visible_row).copied().flatten()
 }
 
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
@@ -816,6 +901,26 @@ mod tests {
     use tempfile::tempdir;
 
     use super::*;
+
+    #[test]
+    fn task_hit_testing_tracks_rows_and_wrapping() {
+        let directory = tempdir().unwrap();
+        let mut app = App::load(directory.path().to_path_buf()).unwrap();
+        app.config.long_title_display = LongTitleDisplay::Wrap;
+        let task = crate::model::Task::new("A title long enough to wrap across several rows");
+        let task_id = task.id;
+        app.current_list_mut().tasks.push(task);
+
+        let area = Rect::new(0, 0, 30, 20);
+        // The empty Doing section occupies rows 4..6, the Pending heading is
+        // row 7, and this task begins on row 8. Continuations are clickable.
+        assert_eq!(task_at(&app, area, 4, 8), Some(task_id));
+        assert_eq!(task_at(&app, area, 4, 9), Some(task_id));
+        assert_eq!(task_at(&app, area, 4, 7), None);
+
+        app.overlay = Overlay::Help;
+        assert_eq!(task_at(&app, area, 4, 8), None);
+    }
 
     #[test]
     fn both_views_render() {

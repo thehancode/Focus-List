@@ -7,7 +7,8 @@ use std::{
 
 use anyhow::{Context, Result};
 use eframe::egui::{
-    self, Align2, Color32, FontData, FontDefinitions, FontFamily, FontId, Pos2, Rect, Vec2,
+    self, Align2, Color32, FontData, FontDefinitions, FontFamily, FontId, Pos2, Rect,
+    ResizeDirection, Vec2,
 };
 use ratatui::{
     Terminal,
@@ -117,6 +118,42 @@ impl NativeApp {
         }
     }
 
+    fn handle_pointer(&mut self, ctx: &egui::Context, area: Rect) {
+        let font_size = self.app.config.native_font_size as f32;
+        let geometry = GridGeometry::new(ctx, area, cell_metrics(ctx, font_size));
+        let (pointer, pressed) =
+            ctx.input(|input| (input.pointer.hover_pos(), input.pointer.primary_pressed()));
+        let Some(cell) = pointer.and_then(|position| geometry.cell_at(position)) else {
+            return;
+        };
+
+        match grid_hit(cell, geometry.size, &self.app) {
+            GridHit::Drag => {
+                ctx.set_cursor_icon(egui::CursorIcon::Grab);
+                if pressed {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::StartDrag);
+                }
+            }
+            GridHit::Resize(direction) => {
+                ctx.set_cursor_icon(resize_cursor(direction));
+                if pressed {
+                    ctx.send_viewport_cmd(egui::ViewportCommand::BeginResize(direction));
+                }
+            }
+            GridHit::Task(task_id) => {
+                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                self.app.selected_task = Some(task_id);
+                if pressed {
+                    self.app.handle_key(
+                        KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE),
+                        Instant::now(),
+                    );
+                }
+            }
+            GridHit::Content => {}
+        }
+    }
+
     fn render(&mut self, ui_context: &egui::Context, ui: &mut egui::Ui, area: Rect) {
         let font_size = self.app.config.native_font_size as f32;
         let metrics = cell_metrics(ui_context, font_size);
@@ -133,20 +170,8 @@ impl NativeApp {
             return;
         }
 
-        let grid_size = Vec2::new(
-            grid.0 as f32 * metrics.width,
-            grid.1 as f32 * metrics.height,
-        );
-        let origin = Pos2::new(
-            snap_to_pixel(
-                ui_context,
-                area.min.x + (area.width() - grid_size.x).max(0.0) / 2.0,
-            ),
-            snap_to_pixel(
-                ui_context,
-                area.min.y + (area.height() - grid_size.y).max(0.0) / 2.0,
-            ),
-        );
+        let geometry = GridGeometry::new(ui_context, area, metrics);
+        let origin = geometry.origin;
         let painter = ui.painter_at(area);
         let regular_font = FontId::new(font_size, FontFamily::Name(REGULAR_FONT.into()));
         let bold_font = FontId::new(font_size, FontFamily::Name(BOLD_FONT.into()));
@@ -210,6 +235,7 @@ impl eframe::App for NativeApp {
                         ui.colored_label(Color32::from_rgb(244, 112, 122), error);
                     });
                 } else {
+                    self.handle_pointer(&ctx, area);
                     self.render(&ctx, ui, area);
                 }
             });
@@ -224,6 +250,103 @@ impl eframe::App for NativeApp {
 struct CellMetrics {
     width: f32,
     height: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct GridGeometry {
+    origin: Pos2,
+    metrics: CellMetrics,
+    size: (u16, u16),
+}
+
+impl GridGeometry {
+    fn new(ctx: &egui::Context, area: Rect, metrics: CellMetrics) -> Self {
+        let size = grid_size(area.size(), metrics);
+        let rendered_size = Vec2::new(
+            size.0 as f32 * metrics.width,
+            size.1 as f32 * metrics.height,
+        );
+        let origin = Pos2::new(
+            snap_to_pixel(
+                ctx,
+                area.min.x + (area.width() - rendered_size.x).max(0.0) / 2.0,
+            ),
+            snap_to_pixel(
+                ctx,
+                area.min.y + (area.height() - rendered_size.y).max(0.0) / 2.0,
+            ),
+        );
+        Self {
+            origin,
+            metrics,
+            size,
+        }
+    }
+
+    fn cell_at(self, position: Pos2) -> Option<(u16, u16)> {
+        let relative = position - self.origin;
+        if relative.x < 0.0 || relative.y < 0.0 {
+            return None;
+        }
+        let column = (relative.x / self.metrics.width).floor() as u16;
+        let row = (relative.y / self.metrics.height).floor() as u16;
+        (column < self.size.0 && row < self.size.1).then_some((column, row))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GridHit {
+    Drag,
+    Resize(ResizeDirection),
+    Task(uuid::Uuid),
+    Content,
+}
+
+fn grid_hit(cell: (u16, u16), size: (u16, u16), app: &App) -> GridHit {
+    if let Some(hit) = chrome_hit(cell, size) {
+        return hit;
+    }
+
+    ui::task_at(
+        app,
+        ratatui::layout::Rect::new(0, 0, size.0, size.1),
+        cell.0,
+        cell.1,
+    )
+    .map(GridHit::Task)
+    .unwrap_or(GridHit::Content)
+}
+
+fn chrome_hit(cell: (u16, u16), size: (u16, u16)) -> Option<GridHit> {
+    let (column, row) = cell;
+    if size.0 == 0 || size.1 == 0 {
+        return None;
+    }
+
+    // The top character row replaces the missing native title bar.
+    if row == 0 {
+        return Some(GridHit::Drag);
+    }
+    let last_column = size.0 - 1;
+    let last_row = size.1 - 1;
+    let resize = match (column, row) {
+        (0, y) if y == last_row => Some(ResizeDirection::SouthWest),
+        (x, y) if x == last_column && y == last_row => Some(ResizeDirection::SouthEast),
+        (_, y) if y == last_row => Some(ResizeDirection::South),
+        (0, _) => Some(ResizeDirection::West),
+        (x, _) if x == last_column => Some(ResizeDirection::East),
+        _ => None,
+    };
+    resize.map(GridHit::Resize)
+}
+
+fn resize_cursor(direction: ResizeDirection) -> egui::CursorIcon {
+    match direction {
+        ResizeDirection::North | ResizeDirection::South => egui::CursorIcon::ResizeVertical,
+        ResizeDirection::East | ResizeDirection::West => egui::CursorIcon::ResizeHorizontal,
+        ResizeDirection::NorthEast | ResizeDirection::SouthWest => egui::CursorIcon::ResizeNeSw,
+        ResizeDirection::NorthWest | ResizeDirection::SouthEast => egui::CursorIcon::ResizeNwSe,
+    }
 }
 
 fn install_fonts(ctx: &egui::Context) {
@@ -410,6 +533,50 @@ mod tests {
             grid_size(Vec2::new(f32::INFINITY, f32::INFINITY), metrics),
             (u16::MAX, u16::MAX)
         );
+    }
+
+    #[test]
+    fn pointer_coordinates_map_to_cells_at_any_cell_size() {
+        for metrics in [
+            CellMetrics {
+                width: 8.4,
+                height: 17.0,
+            },
+            CellMetrics {
+                width: 13.125,
+                height: 26.5,
+            },
+        ] {
+            let geometry = GridGeometry {
+                origin: Pos2::new(3.0, 5.0),
+                metrics,
+                size: (80, 24),
+            };
+            assert_eq!(geometry.cell_at(geometry.origin), Some((0, 0)));
+            assert_eq!(
+                geometry.cell_at(
+                    geometry.origin + Vec2::new(metrics.width * 17.5, metrics.height * 9.25)
+                ),
+                Some((17, 9))
+            );
+            assert_eq!(geometry.cell_at(geometry.origin - Vec2::splat(0.1)), None);
+        }
+    }
+
+    #[test]
+    fn top_grid_border_drags_and_other_edges_resize() {
+        let size = (80, 24);
+        assert_eq!(chrome_hit((40, 0), size), Some(GridHit::Drag));
+        assert_eq!(chrome_hit((0, 0), size), Some(GridHit::Drag));
+        assert_eq!(
+            chrome_hit((0, 12), size),
+            Some(GridHit::Resize(ResizeDirection::West))
+        );
+        assert_eq!(
+            chrome_hit((79, 23), size),
+            Some(GridHit::Resize(ResizeDirection::SouthEast))
+        );
+        assert_eq!(chrome_hit((40, 12), size), None);
     }
 
     #[test]
