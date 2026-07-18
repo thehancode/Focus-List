@@ -17,15 +17,15 @@ without requiring Ghostty or another terminal emulator:
 cargo run --release --bin tui-kanban-native
 ```
 
-It currently shares the terminal version's data directory and JSON file, so do
+It currently shares the terminal version's data directory and JSON files, so do
 not run both editions at the same time. The preview preserves the Ratatui grid
 renderer while the remaining cross-platform input, sound, and packaging work is
 completed. It bundles UbuntuMono Nerd Font Mono for consistent, crisp rendering;
 its Ubuntu Font Licence is included at `assets/licenses/`.
 
-The app saves everything immediately in one human-readable JSON file:
-`~/.local/share/tui-kanban/tasklists/tasklist.json` (or
-`$XDG_DATA_HOME/tui-kanban/tasklists/tasklist.json` when `XDG_DATA_HOME` is set).
+The app saves each task list immediately in its own human-readable, UUID-named JSON file under
+`~/.local/share/tui-kanban/tasklists/` (or
+`$XDG_DATA_HOME/tui-kanban/tasklists/` when `XDG_DATA_HOME` is set).
 Settings are stored beside it in `config/settings.json`; the default is:
 
 ```json
@@ -40,6 +40,10 @@ Settings are stored beside it in `config/settings.json`; the default is:
 
 | Key | Action |
 | --- | --- |
+| `Tab` / `Shift+Tab` | Cycle forward/backward through task lists |
+| `Ctrl+N` | Create and switch to a new task list |
+| `F2`, `Ctrl+R` | Rename the current task list |
+| `Ctrl+X` | Delete the current task list after confirmation |
 | `↑`/`↓`, `j`/`k` | Select task |
 | `Space`, then `f` | Pending → Doing → Done → Pending |
 | `Space`, then `↑`/`↓` | Move the selected task within its current status group |

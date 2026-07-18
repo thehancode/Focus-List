@@ -7,7 +7,6 @@ use anyhow::{Context, Result};
 
 use crate::model::{AppConfig, TaskList};
 
-const TASK_LIST_FILE: &str = "tasklist.json";
 const CONFIG_FILE: &str = "config/settings.json";
 
 #[derive(Debug)]
@@ -75,28 +74,10 @@ impl TaskStore {
         &self.root
     }
 
-    /// Loads the single canonical task-list file. Older versions created one
-    /// file per list; on first launch those files are consolidated here.
     pub fn load(&self) -> Result<LoadResult> {
         fs::create_dir_all(&self.root)
             .with_context(|| format!("could not create {}", self.root.display()))?;
-        let path = self.path();
-        if path.exists() {
-            return self
-                .read_one(&path)
-                .map(|list| LoadResult {
-                    lists: vec![list],
-                    warnings: Vec::new(),
-                })
-                .map_err(|error| anyhow::anyhow!("could not load {}: {error:#}", path.display()));
-        }
-
-        self.migrate_legacy_lists()
-    }
-
-    fn migrate_legacy_lists(&self) -> Result<LoadResult> {
-        let mut legacy_paths = Vec::new();
-        let mut tasks = Vec::new();
+        let mut loaded = Vec::new();
         let mut warnings = Vec::new();
         for entry in fs::read_dir(&self.root)? {
             let path = entry?.path();
@@ -104,32 +85,53 @@ impl TaskStore {
                 continue;
             }
             match self.read_one(&path) {
-                Ok(list) => {
-                    legacy_paths.push(path);
-                    tasks.extend(list.tasks);
-                }
+                Ok(list) => loaded.push((path, list)),
                 Err(error) => warnings.push(format!("Skipped {}: {error:#}", path.display())),
             }
         }
-        if legacy_paths.is_empty() {
-            return Ok(LoadResult {
-                lists: Vec::new(),
-                warnings,
-            });
-        }
 
-        let mut list = TaskList::named("Tasks");
-        list.tasks = tasks;
-        self.save(&list)?;
-        for path in legacy_paths {
-            fs::remove_file(&path)
-                .with_context(|| format!("could not remove migrated file {}", path.display()))?;
+        loaded.sort_by_key(|(path, list)| {
+            (list.created_at, list.id, *path != self.path_for(list.id))
+        });
+        let mut lists: Vec<TaskList> = Vec::with_capacity(loaded.len());
+        for (source, mut list) in loaded {
+            if let Some(existing) = lists.iter().find(|existing| existing.id == list.id) {
+                if source != self.path_for(list.id) && existing == &list {
+                    fs::remove_file(&source).with_context(|| {
+                        format!(
+                            "could not remove duplicate legacy file {}",
+                            source.display()
+                        )
+                    })?;
+                } else {
+                    warnings.push(format!(
+                        "Skipped {}: duplicate task-list id {}",
+                        source.display(),
+                        list.id
+                    ));
+                }
+                continue;
+            }
+            let original_name = list.name.clone();
+            list.name = unique_name(&original_name, &lists);
+            if list.name != original_name {
+                warnings.push(format!(
+                    "Renamed duplicate list {original_name:?} to {:?}",
+                    list.name
+                ));
+            }
+            let destination = self.path_for(list.id);
+            if source != destination || list.name != original_name {
+                self.save(&list)?;
+                if source != destination {
+                    fs::remove_file(&source).with_context(|| {
+                        format!("could not remove migrated file {}", source.display())
+                    })?;
+                }
+            }
+            lists.push(list);
         }
-        warnings.push("Migrated older task-list files into tasklist.json".into());
-        Ok(LoadResult {
-            lists: vec![list],
-            warnings,
-        })
+        Ok(LoadResult { lists, warnings })
     }
 
     fn read_one(&self, path: &Path) -> Result<TaskList> {
@@ -151,7 +153,7 @@ impl TaskStore {
     pub fn save(&self, list: &TaskList) -> Result<()> {
         list.validate()?;
         fs::create_dir_all(&self.root)?;
-        let path = self.path();
+        let path = self.path_for(list.id);
         let temp = path.with_extension("json.tmp");
         let json = serde_json::to_string_pretty(list)?;
         fs::write(&temp, format!("{json}\n"))
@@ -161,9 +163,33 @@ impl TaskStore {
         Ok(())
     }
 
-    fn path(&self) -> PathBuf {
-        self.root.join(TASK_LIST_FILE)
+    pub fn delete(&self, id: uuid::Uuid) -> Result<()> {
+        let path = self.path_for(id);
+        fs::remove_file(&path).with_context(|| format!("could not remove {}", path.display()))
     }
+
+    pub fn path_for(&self, id: uuid::Uuid) -> PathBuf {
+        self.root.join(format!("{id}.json"))
+    }
+}
+
+fn unique_name(requested: &str, existing: &[TaskList]) -> String {
+    if !existing
+        .iter()
+        .any(|list| list.name.eq_ignore_ascii_case(requested))
+    {
+        return requested.to_owned();
+    }
+    for suffix in 2.. {
+        let candidate = format!("{requested} ({suffix})");
+        if !existing
+            .iter()
+            .any(|list| list.name.eq_ignore_ascii_case(&candidate))
+        {
+            return candidate;
+        }
+    }
+    unreachable!()
 }
 
 #[cfg(test)]
@@ -176,31 +202,79 @@ mod tests {
     use crate::model::Task;
 
     #[test]
-    fn saves_and_loads_one_tasklist_file() {
+    fn saves_and_loads_multiple_tasklist_files() {
         let directory = tempdir().unwrap();
         let store = TaskStore::new(directory.path());
-        let mut list = TaskList::named("Tasks");
-        list.tasks.push(Task::new("Write tests"));
-        store.save(&list).unwrap();
+        let mut first = TaskList::named("Tasks");
+        first.tasks.push(Task::new("Write tests"));
+        let mut second = TaskList::named("Work");
+        second.created_at = first.created_at + chrono::Duration::microseconds(1);
+        store.save(&first).unwrap();
+        store.save(&second).unwrap();
 
         let loaded = store.load().unwrap();
-        assert_eq!(loaded.lists, vec![list]);
-        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
-        assert!(directory.path().join(TASK_LIST_FILE).exists());
+        assert_eq!(loaded.lists, vec![first.clone(), second.clone()]);
+        assert!(store.path_for(first.id).exists());
+        assert!(store.path_for(second.id).exists());
     }
 
     #[test]
-    fn migrates_older_json_files_into_one_tasklist() {
+    fn migrates_legacy_files_without_merging_lists() {
         let directory = tempdir().unwrap();
-        let old_path = directory.path().join("2026-01-01.json");
-        let mut old_list = TaskList::named("Old tasks");
-        old_list.tasks.push(Task::new("Keep me"));
-        fs::write(&old_path, serde_json::to_string(&old_list).unwrap()).unwrap();
+        let first_path = directory.path().join("tasklist.json");
+        let second_path = directory.path().join("2026-01-01.json");
+        let mut first = TaskList::named("Tasks");
+        first.tasks.push(Task::new("Keep me"));
+        let mut second = TaskList::named("Work");
+        second.created_at = first.created_at + chrono::Duration::microseconds(1);
+        fs::write(&first_path, serde_json::to_string(&first).unwrap()).unwrap();
+        fs::write(&second_path, serde_json::to_string(&second).unwrap()).unwrap();
+
+        let store = TaskStore::new(directory.path());
+        let loaded = store.load().unwrap();
+        assert_eq!(loaded.lists.len(), 2);
+        assert_eq!(loaded.lists[0].tasks.len(), 1);
+        assert!(!first_path.exists());
+        assert!(!second_path.exists());
+        assert!(store.path_for(first.id).exists());
+        assert!(store.path_for(second.id).exists());
+    }
+
+    #[test]
+    fn disambiguates_duplicate_legacy_names() {
+        let directory = tempdir().unwrap();
+        let first = TaskList::named("Work");
+        let mut second = TaskList::named("work");
+        second.created_at = first.created_at + chrono::Duration::microseconds(1);
+        fs::write(
+            directory.path().join("first.json"),
+            serde_json::to_string(&first).unwrap(),
+        )
+        .unwrap();
+        fs::write(
+            directory.path().join("second.json"),
+            serde_json::to_string(&second).unwrap(),
+        )
+        .unwrap();
 
         let loaded = TaskStore::new(directory.path()).load().unwrap();
-        assert_eq!(loaded.lists[0].tasks.len(), 1);
-        assert!(!old_path.exists());
-        assert!(directory.path().join(TASK_LIST_FILE).exists());
+        assert_eq!(loaded.lists[0].name, "Work");
+        assert_eq!(loaded.lists[1].name, "work (2)");
+        assert!(!loaded.warnings.is_empty());
+    }
+
+    #[test]
+    fn deletes_only_the_requested_list() {
+        let directory = tempdir().unwrap();
+        let store = TaskStore::new(directory.path());
+        let first = TaskList::named("Tasks");
+        let second = TaskList::named("Work");
+        store.save(&first).unwrap();
+        store.save(&second).unwrap();
+
+        store.delete(first.id).unwrap();
+        assert!(!store.path_for(first.id).exists());
+        assert!(store.path_for(second.id).exists());
     }
 
     #[test]

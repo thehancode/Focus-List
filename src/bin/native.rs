@@ -429,18 +429,27 @@ fn egui_key(key: egui::Key, modifiers: egui::Modifiers) -> Option<KeyEvent> {
         egui::Key::End => KeyCode::End,
         egui::Key::Escape => KeyCode::Esc,
         egui::Key::Tab => KeyCode::Tab,
+        egui::Key::F2 => KeyCode::F(2),
         egui::Key::Enter => KeyCode::Enter,
         egui::Key::Backspace => KeyCode::Backspace,
         egui::Key::Delete => KeyCode::Delete,
         egui::Key::Space => KeyCode::Char(' '),
         egui::Key::C if modifiers.ctrl || modifiers.command => KeyCode::Char('c'),
+        egui::Key::N if modifiers.ctrl || modifiers.command => KeyCode::Char('n'),
+        egui::Key::R if modifiers.ctrl || modifiers.command => KeyCode::Char('r'),
+        egui::Key::X if modifiers.ctrl || modifiers.command => KeyCode::Char('x'),
         _ => return None,
     };
-    let modifier = if modifiers.ctrl || modifiers.command {
-        KeyModifiers::CONTROL
-    } else {
-        KeyModifiers::NONE
-    };
+    let mut modifier = KeyModifiers::NONE;
+    if modifiers.ctrl || modifiers.command {
+        modifier.insert(KeyModifiers::CONTROL);
+    }
+    if modifiers.shift {
+        modifier.insert(KeyModifiers::SHIFT);
+    }
+    if modifiers.alt {
+        modifier.insert(KeyModifiers::ALT);
+    }
     Some(KeyEvent::new(code, modifier))
 }
 
@@ -630,5 +639,25 @@ mod tests {
         assert_eq!(key.code, KeyCode::Char('c'));
         assert!(key.modifiers.contains(KeyModifiers::CONTROL));
         assert!(egui_key(egui::Key::C, egui::Modifiers::NONE).is_none());
+    }
+
+    #[test]
+    fn list_shortcuts_preserve_modifiers() {
+        for (source, expected) in [
+            (egui::Key::N, KeyCode::Char('n')),
+            (egui::Key::R, KeyCode::Char('r')),
+            (egui::Key::X, KeyCode::Char('x')),
+        ] {
+            let key = egui_key(source, egui::Modifiers::CTRL).unwrap();
+            assert_eq!(key.code, expected);
+            assert!(key.modifiers.contains(KeyModifiers::CONTROL));
+        }
+        let tab = egui_key(egui::Key::Tab, egui::Modifiers::SHIFT).unwrap();
+        assert_eq!(tab.code, KeyCode::Tab);
+        assert!(tab.modifiers.contains(KeyModifiers::SHIFT));
+        assert_eq!(
+            egui_key(egui::Key::F2, egui::Modifiers::NONE).unwrap().code,
+            KeyCode::F(2)
+        );
     }
 }

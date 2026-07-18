@@ -32,6 +32,12 @@ pub enum PromptKind {
     EditTask,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListPromptKind {
+    Add,
+    Rename,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Overlay {
     None,
@@ -43,6 +49,12 @@ pub enum Overlay {
         daily: bool,
     },
     ConfirmDelete,
+    ListPrompt {
+        kind: ListPromptKind,
+        input: String,
+        cursor: usize,
+    },
+    ConfirmDeleteList,
     Settings {
         selected: usize,
     },
@@ -192,9 +204,27 @@ impl App {
                 }
                 return;
             }
+            Overlay::ListPrompt {
+                kind,
+                input,
+                cursor,
+            } => {
+                self.handle_list_prompt(key, kind, input, cursor);
+                return;
+            }
             Overlay::ConfirmDelete => {
                 match key.code {
                     KeyCode::Char('y') | KeyCode::Char('Y') => self.delete_selected(),
+                    KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
+                        self.overlay = Overlay::None
+                    }
+                    _ => {}
+                }
+                return;
+            }
+            Overlay::ConfirmDeleteList => {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => self.delete_current_list(),
                     KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('N') => {
                         self.overlay = Overlay::None
                     }
@@ -207,6 +237,37 @@ impl App {
                 return;
             }
             Overlay::None => {}
+        }
+
+        if key.modifiers.contains(KeyModifiers::CONTROL) {
+            match key.code {
+                KeyCode::Char('c') | KeyCode::Char('C') => self.should_quit = true,
+                KeyCode::Char('n') | KeyCode::Char('N') => self.open_add_list(),
+                KeyCode::Char('r') | KeyCode::Char('R') => self.open_rename_list(),
+                KeyCode::Char('x') | KeyCode::Char('X') => self.confirm_delete_current_list(),
+                _ => {}
+            }
+            return;
+        }
+
+        match key.code {
+            KeyCode::F(2) => {
+                self.open_rename_list();
+                return;
+            }
+            KeyCode::BackTab => {
+                self.switch_list(-1);
+                return;
+            }
+            KeyCode::Tab => {
+                self.switch_list(if key.modifiers.contains(KeyModifiers::SHIFT) {
+                    -1
+                } else {
+                    1
+                });
+                return;
+            }
+            _ => {}
         }
 
         if key.code == KeyCode::Char(' ') {
@@ -417,6 +478,184 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn handle_list_prompt(
+        &mut self,
+        key: KeyEvent,
+        kind: ListPromptKind,
+        mut input: String,
+        mut cursor: usize,
+    ) {
+        match key.code {
+            KeyCode::Esc => self.overlay = Overlay::None,
+            KeyCode::Enter => self.save_list_prompt(kind, input),
+            KeyCode::Backspace => {
+                if let Some(start) = previous_char_boundary(&input, cursor) {
+                    input.drain(start..cursor);
+                    cursor = start;
+                }
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            KeyCode::Delete => {
+                if let Some(end) = next_char_boundary(&input, cursor) {
+                    input.drain(cursor..end);
+                }
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            KeyCode::Left => {
+                cursor = previous_char_boundary(&input, cursor).unwrap_or(cursor);
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            KeyCode::Right => {
+                cursor = next_char_boundary(&input, cursor).unwrap_or(cursor);
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            KeyCode::Home | KeyCode::Up => {
+                cursor = 0;
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            KeyCode::End | KeyCode::Down => {
+                cursor = input.len();
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            KeyCode::Char(character) if !key.modifiers.contains(KeyModifiers::CONTROL) => {
+                input.insert(cursor, character);
+                cursor += character.len_utf8();
+                self.overlay = Overlay::ListPrompt {
+                    kind,
+                    input,
+                    cursor,
+                };
+            }
+            _ => {}
+        }
+    }
+
+    fn save_list_prompt(&mut self, kind: ListPromptKind, input: String) {
+        let name = normalize_name(&input);
+        if name.is_empty() {
+            self.set_notice("A list name cannot be empty".into(), true);
+            return;
+        }
+        let duplicate = self.lists.iter().enumerate().any(|(index, list)| {
+            (kind == ListPromptKind::Add || index != self.current)
+                && list.name.eq_ignore_ascii_case(&name)
+        });
+        if duplicate {
+            self.set_notice("A list with that name already exists".into(), true);
+            return;
+        }
+        match kind {
+            ListPromptKind::Add => {
+                let list = TaskList::named(name);
+                match self.store.save(&list) {
+                    Ok(()) => {
+                        self.lists.push(list);
+                        self.current = self.lists.len() - 1;
+                        self.overlay = Overlay::None;
+                        self.reset_after_list_switch();
+                        self.set_notice("List created".into(), false);
+                    }
+                    Err(error) => self.set_notice(format!("List save failed: {error:#}"), true),
+                }
+            }
+            ListPromptKind::Rename => {
+                let old_name = std::mem::replace(&mut self.lists[self.current].name, name);
+                match self.store.save(self.current_list()) {
+                    Ok(()) => {
+                        self.overlay = Overlay::None;
+                        self.set_notice("List renamed".into(), false);
+                    }
+                    Err(error) => {
+                        self.lists[self.current].name = old_name;
+                        self.set_notice(format!("List save failed: {error:#}"), true);
+                    }
+                }
+            }
+        }
+    }
+
+    fn open_add_list(&mut self) {
+        self.overlay = Overlay::ListPrompt {
+            kind: ListPromptKind::Add,
+            input: String::new(),
+            cursor: 0,
+        };
+    }
+
+    fn open_rename_list(&mut self) {
+        let input = self.current_list().name.clone();
+        self.overlay = Overlay::ListPrompt {
+            kind: ListPromptKind::Rename,
+            cursor: input.len(),
+            input,
+        };
+    }
+
+    fn confirm_delete_current_list(&mut self) {
+        if self.lists.len() == 1 {
+            self.set_notice("The last list cannot be deleted".into(), true);
+        } else {
+            self.overlay = Overlay::ConfirmDeleteList;
+        }
+    }
+
+    fn delete_current_list(&mut self) {
+        let id = self.current_list().id;
+        match self.store.delete(id) {
+            Ok(()) => {
+                self.lists.remove(self.current);
+                self.current = self.current.min(self.lists.len() - 1);
+                self.overlay = Overlay::None;
+                self.reset_after_list_switch();
+                self.set_notice("List deleted".into(), false);
+            }
+            Err(error) => self.set_notice(format!("List delete failed: {error:#}"), true),
+        }
+    }
+
+    fn switch_list(&mut self, direction: isize) {
+        if self.lists.len() < 2 {
+            return;
+        }
+        self.current = if direction < 0 {
+            self.current.checked_sub(1).unwrap_or(self.lists.len() - 1)
+        } else {
+            (self.current + 1) % self.lists.len()
+        };
+        self.reset_after_list_switch();
+    }
+
+    fn reset_after_list_switch(&mut self) {
+        self.view = ViewMode::List;
+        self.chord_started = None;
+        self.animation = None;
+        self.select_first();
     }
 
     fn save_prompt(&mut self, kind: PromptKind, input: String, daily: bool) {
@@ -732,6 +971,10 @@ impl App {
 
 fn move_index(index: usize, delta: isize, length: usize) -> usize {
     (index as isize + delta).clamp(0, length.saturating_sub(1) as isize) as usize
+}
+
+fn normalize_name(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn previous_char_boundary(value: &str, cursor: usize) -> Option<usize> {
@@ -1063,6 +1306,123 @@ mod tests {
         assert_eq!(app.current_list().tasks[1].id, second_id);
         assert_eq!(app.selected_task, Some(first_id));
         assert!(app.chord_started.is_none());
+    }
+
+    #[test]
+    fn control_n_creates_and_activates_a_list() {
+        let mut app = app();
+        let now = Instant::now();
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('n'), KeyModifiers::CONTROL),
+            now,
+        );
+        assert!(matches!(
+            app.overlay,
+            Overlay::ListPrompt {
+                kind: ListPromptKind::Add,
+                ..
+            }
+        ));
+        app.save_list_prompt(ListPromptKind::Add, "  Personal   Tasks ".into());
+
+        assert_eq!(app.lists.len(), 2);
+        assert_eq!(app.current, 1);
+        assert_eq!(app.current_list().name, "Personal Tasks");
+        assert!(app.store.path_for(app.current_list().id).exists());
+    }
+
+    #[test]
+    fn list_names_are_unique_ignoring_case() {
+        let mut app = app();
+        app.save_list_prompt(ListPromptKind::Add, "tasks".into());
+
+        assert_eq!(app.lists.len(), 1);
+        assert!(app.notice.as_ref().unwrap().error);
+    }
+
+    #[test]
+    fn tab_and_backtab_cycle_lists_and_reset_the_view() {
+        let mut app = app();
+        app.save_list_prompt(ListPromptKind::Add, "Work".into());
+        app.view = ViewMode::Completed;
+        let now = Instant::now();
+
+        app.handle_key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE), now);
+        assert_eq!(app.current, 0);
+        assert_eq!(app.view, ViewMode::List);
+        app.handle_key(
+            KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT),
+            now + Duration::from_millis(1),
+        );
+        assert_eq!(app.current, 1);
+    }
+
+    #[test]
+    fn f2_and_control_r_open_the_rename_prompt() {
+        let mut app = app();
+        let now = Instant::now();
+        for key in [
+            KeyEvent::new(KeyCode::F(2), KeyModifiers::NONE),
+            KeyEvent::new(KeyCode::Char('r'), KeyModifiers::CONTROL),
+        ] {
+            app.overlay = Overlay::None;
+            app.handle_key(key, now);
+            assert_eq!(
+                app.overlay,
+                Overlay::ListPrompt {
+                    kind: ListPromptKind::Rename,
+                    input: "Tasks".into(),
+                    cursor: 5,
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn renaming_a_list_is_persisted() {
+        let mut app = app();
+        let id = app.current_list().id;
+        app.save_list_prompt(ListPromptKind::Rename, "  Main   Tasks ".into());
+
+        let saved = app.store.load().unwrap();
+        assert_eq!(app.current_list().name, "Main Tasks");
+        assert_eq!(
+            saved.lists.iter().find(|list| list.id == id).unwrap().name,
+            "Main Tasks"
+        );
+    }
+
+    #[test]
+    fn confirmed_list_deletion_removes_its_file_and_selects_a_neighbor() {
+        let mut app = app();
+        app.save_list_prompt(ListPromptKind::Add, "Work".into());
+        let deleted_id = app.current_list().id;
+        let now = Instant::now();
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL),
+            now,
+        );
+        assert_eq!(app.overlay, Overlay::ConfirmDeleteList);
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('y'), KeyModifiers::NONE),
+            now + Duration::from_millis(1),
+        );
+
+        assert_eq!(app.lists.len(), 1);
+        assert_eq!(app.current_list().name, "Tasks");
+        assert!(!app.store.path_for(deleted_id).exists());
+    }
+
+    #[test]
+    fn the_last_list_cannot_be_deleted() {
+        let mut app = app();
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL),
+            Instant::now(),
+        );
+        assert_eq!(app.overlay, Overlay::None);
+        assert_eq!(app.lists.len(), 1);
+        assert!(app.notice.as_ref().unwrap().error);
     }
 
     #[test]

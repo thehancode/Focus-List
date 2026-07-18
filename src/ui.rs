@@ -10,7 +10,7 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 use crate::{
-    app::{ANIMATION_DURATION, App, Overlay, PromptKind, ViewMode},
+    app::{ANIMATION_DURATION, App, ListPromptKind, Overlay, PromptKind, ViewMode},
     model::{LongTitleDisplay, Status, Task},
 };
 
@@ -59,6 +59,12 @@ pub fn render(frame: &mut Frame, app: &App) {
             daily,
         } => render_prompt(frame, *kind, input, *cursor, *daily, area),
         Overlay::ConfirmDelete => render_confirm(frame, area),
+        Overlay::ListPrompt {
+            kind,
+            input,
+            cursor,
+        } => render_list_prompt(frame, *kind, input, *cursor, area),
+        Overlay::ConfirmDeleteList => render_list_confirm(frame, app, area),
         Overlay::Settings { selected } => render_settings(frame, app, *selected, area),
     }
 }
@@ -158,6 +164,7 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     let spacing = area
         .width
         .saturating_sub((title.chars().count() + view.chars().count()) as u16);
+    let title_area = Rect::new(area.x, area.y, area.width, 1);
     frame.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(title, Style::new().fg(BG).bg(VIOLET).bold()),
@@ -165,6 +172,62 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
             Span::styled(view, Style::new().fg(MUTED).bold()),
         ]))
         .style(Style::new().bg(BG)),
+        title_area,
+    );
+    render_tabs(frame, app, Rect::new(area.x, area.y + 1, area.width, 1));
+}
+
+fn render_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let labels: Vec<String> = app
+        .lists
+        .iter()
+        .map(|list| format!(" {} ", list.name))
+        .collect();
+    let width = area.width as usize;
+    let mut start = app.current;
+    let mut used = labels[app.current].chars().count().min(width);
+    while start > 0 {
+        let candidate = labels[start - 1].chars().count();
+        let indicator = usize::from(start - 1 > 0);
+        if used + candidate + indicator > width {
+            break;
+        }
+        start -= 1;
+        used += candidate;
+    }
+    let left_hidden = start > 0;
+    used += usize::from(left_hidden);
+    let mut end = app.current + 1;
+    while end < labels.len() {
+        let candidate = labels[end].chars().count();
+        let right_indicator = usize::from(end + 1 < labels.len());
+        if used + candidate + right_indicator > width {
+            break;
+        }
+        used += candidate;
+        end += 1;
+    }
+    let right_hidden = end < labels.len();
+    let mut spans = Vec::new();
+    if left_hidden {
+        spans.push(Span::styled("‹", Style::new().fg(MUTED)));
+    }
+    for (index, label) in labels.iter().enumerate().take(end).skip(start) {
+        let reserved = usize::from(left_hidden) + usize::from(right_hidden);
+        let available = width.saturating_sub(reserved);
+        let label = truncate(label, available.max(1));
+        let style = if index == app.current {
+            Style::new().fg(BG).bg(VIOLET).bold()
+        } else {
+            Style::new().fg(MUTED).bg(PANEL)
+        };
+        spans.push(Span::styled(label, style));
+    }
+    if right_hidden {
+        spans.push(Span::styled("›", Style::new().fg(MUTED)));
+    }
+    frame.render_widget(
+        Paragraph::new(Line::from(spans)).style(Style::new().bg(BG)),
         area,
     );
 }
@@ -465,6 +528,8 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         Line::styled("", Style::default())
     };
     let keys = Line::from(vec![
+        Span::styled(" tab ", Style::new().fg(VIOLET).bold()),
+        Span::styled("lists  ", Style::new().fg(MUTED)),
         Span::styled(" ↑↓ ", Style::new().fg(VIOLET).bold()),
         Span::styled("move  ", Style::new().fg(MUTED)),
         Span::styled("n ", Style::new().fg(VIOLET).bold()),
@@ -526,6 +591,10 @@ fn render_help(frame: &mut Frame, area: Rect) {
         help_line("Space then f", "Advance task status"),
         help_line("Space then ↑/↓", "Move selected task within its status"),
         help_line("n / e / x", "New, edit, delete task"),
+        help_line("Tab / Shift+Tab", "Switch task lists"),
+        help_line("Ctrl+n", "Create a task list"),
+        help_line("F2 / Ctrl+r", "Rename current task list"),
+        help_line("Ctrl+x", "Delete current task list"),
         help_line("d", "Duplicate selected task"),
         help_line("r", "Revert completed task to Doing"),
         help_line("c", "Toggle Doing focus when work exists"),
@@ -571,6 +640,32 @@ fn render_prompt(
         .wrap(Wrap { trim: true })
         .style(Style::new().fg(MUTED)),
         layout[1],
+    );
+}
+
+fn render_list_prompt(
+    frame: &mut Frame,
+    kind: ListPromptKind,
+    input: &str,
+    cursor: usize,
+    area: Rect,
+) {
+    let title = match kind {
+        ListPromptKind::Add => " NEW LIST ",
+        ListPromptKind::Rename => " RENAME LIST ",
+    };
+    let popup = centered(area, 58, 30, 36, 7);
+    frame.render_widget(Clear, popup);
+    let block = modal_block(title);
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    frame.render_widget(
+        Paragraph::new(format!(
+            " {}\n\n Enter save   Esc cancel",
+            input_with_cursor(input, cursor)
+        ))
+        .style(Style::new().fg(TEXT).bg(BG)),
+        inner,
     );
 }
 
@@ -719,6 +814,27 @@ fn render_confirm(frame: &mut Frame, area: Rect) {
     frame.render_widget(
         Paragraph::new(" This cannot be undone.\n\n y delete    n / Esc cancel")
             .style(Style::new().fg(TEXT)),
+        inner,
+    );
+}
+
+fn render_list_confirm(frame: &mut Frame, app: &App, area: Rect) {
+    let popup = centered(area, 54, 22, 36, 7);
+    frame.render_widget(Clear, popup);
+    let block = Block::new()
+        .title(Line::styled(" DELETE LIST? ", Style::new().fg(RED).bold()))
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(RED))
+        .style(Style::new().bg(PANEL));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    frame.render_widget(
+        Paragraph::new(format!(
+            " Delete {:?} and all its tasks?\n This cannot be undone.\n\n y delete    n / Esc cancel",
+            app.current_list().name
+        ))
+        .style(Style::new().fg(TEXT)),
         inner,
     );
 }
@@ -944,6 +1060,30 @@ mod tests {
             .map(|cell| cell.symbol())
             .collect::<String>();
         assert!(rendered.contains("Terminal too small"));
+    }
+
+    #[test]
+    fn tab_bar_keeps_the_active_list_visible_when_it_overflows() {
+        let directory = tempdir().unwrap();
+        let mut app = App::load(directory.path().to_path_buf()).unwrap();
+        for name in ["Personal", "Work", "Planning", "Archive"] {
+            app.lists.push(crate::model::TaskList::named(name));
+        }
+        app.current = app.lists.len() - 1;
+        let backend = TestBackend::new(18, 1);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| render_tabs(frame, &app, frame.area()))
+            .unwrap();
+        let rendered = terminal
+            .backend()
+            .buffer()
+            .content
+            .iter()
+            .map(|cell| cell.symbol())
+            .collect::<String>();
+        assert!(rendered.contains("Archive"));
+        assert!(rendered.contains('‹'));
     }
 
     #[test]
