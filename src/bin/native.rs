@@ -141,13 +141,8 @@ impl NativeApp {
                 }
             }
             GridHit::Task(task_id) => {
-                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
-                self.app.selected_task = Some(task_id);
                 if pressed {
-                    self.app.handle_key(
-                        KeyEvent::new(KeyCode::Char('e'), KeyModifiers::NONE),
-                        Instant::now(),
-                    );
+                    self.app.selected_task = Some(task_id);
                 }
             }
             GridHit::Content => {}
