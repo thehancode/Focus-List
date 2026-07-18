@@ -27,7 +27,10 @@ fn run(terminal: &mut DefaultTerminal, app: &mut App) -> std::io::Result<()> {
 
         if event::poll(FRAME_TIME)?
             && let Event::Key(key) = event::read()?
-            && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+            && matches!(
+                key.kind,
+                KeyEventKind::Press | KeyEventKind::Repeat | KeyEventKind::Release
+            )
         {
             if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
                 app.should_quit = true;

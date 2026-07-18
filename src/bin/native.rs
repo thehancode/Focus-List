@@ -94,12 +94,21 @@ impl NativeApp {
             match event {
                 egui::Event::Key {
                     key,
-                    pressed: true,
-                    repeat: _,
+                    pressed,
+                    repeat,
                     modifiers,
                     ..
                 } => {
-                    if let Some(key) = egui_key(key, modifiers) {
+                    if let Some(mut key) = egui_key(key, modifiers) {
+                        key.kind = if pressed {
+                            if repeat {
+                                ratatui::crossterm::event::KeyEventKind::Repeat
+                            } else {
+                                ratatui::crossterm::event::KeyEventKind::Press
+                            }
+                        } else {
+                            ratatui::crossterm::event::KeyEventKind::Release
+                        };
                         self.app.handle_key(key, now);
                     }
                 }
@@ -423,6 +432,7 @@ fn egui_key(key: egui::Key, modifiers: egui::Modifiers) -> Option<KeyEvent> {
         egui::Key::Enter => KeyCode::Enter,
         egui::Key::Backspace => KeyCode::Backspace,
         egui::Key::Delete => KeyCode::Delete,
+        egui::Key::Space => KeyCode::Char(' '),
         egui::Key::C if modifiers.ctrl || modifiers.command => KeyCode::Char('c'),
         _ => return None,
     };

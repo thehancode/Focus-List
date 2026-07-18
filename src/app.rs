@@ -5,7 +5,7 @@ use std::{
 };
 
 use anyhow::Result;
-use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use uuid::Uuid;
 
 use crate::{
@@ -166,6 +166,13 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent, now: Instant) {
+        if key.kind == KeyEventKind::Release {
+            if key.code == KeyCode::Char(' ') {
+                self.chord_started = None;
+            }
+            return;
+        }
+
         match self.overlay.clone() {
             Overlay::Prompt {
                 kind,
@@ -215,8 +222,14 @@ impl App {
                     self.chord_started = None;
                     self.advance_status(now);
                 }
-                KeyCode::Up | KeyCode::Char('k') => self.reorder_selected(-1),
-                KeyCode::Down | KeyCode::Char('j') => self.reorder_selected(1),
+                KeyCode::Up | KeyCode::Char('k') => {
+                    self.reorder_selected(-1);
+                    self.chord_started = Some(now);
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    self.reorder_selected(1);
+                    self.chord_started = Some(now);
+                }
                 _ => self.chord_started = None,
             }
             return;
@@ -998,6 +1011,58 @@ mod tests {
 
         assert_eq!(app.current_list().tasks[0].id, third_id);
         assert_eq!(app.selected_task, Some(third_id));
+    }
+
+    #[test]
+    fn each_reorder_refreshes_the_grab_timeout() {
+        let mut app = app();
+        let tasks: Vec<_> = (1..=5)
+            .map(|number| Task::new(format!("Task {number}")))
+            .collect();
+        let grabbed_id = tasks[4].id;
+        app.current_list_mut().tasks.extend(tasks);
+        app.selected_task = Some(grabbed_id);
+        let now = Instant::now();
+
+        app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE), now);
+        for offset in [500, 1_000, 1_500, 2_000] {
+            let event_time = now + Duration::from_millis(offset);
+            app.tick(event_time);
+            app.handle_key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE), event_time);
+        }
+
+        assert_eq!(app.current_list().tasks[0].id, grabbed_id);
+        assert_eq!(app.selected_task, Some(grabbed_id));
+    }
+
+    #[test]
+    fn releasing_space_stops_reordering() {
+        let mut app = app();
+        let first = Task::new("First");
+        let first_id = first.id;
+        let second = Task::new("Second");
+        let second_id = second.id;
+        app.current_list_mut().tasks.extend([first, second]);
+        app.selected_task = Some(second_id);
+        let now = Instant::now();
+
+        app.handle_key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE), now);
+        app.handle_key(
+            KeyEvent::new_with_kind(
+                KeyCode::Char(' '),
+                KeyModifiers::NONE,
+                KeyEventKind::Release,
+            ),
+            now + Duration::from_millis(1),
+        );
+        app.handle_key(
+            KeyEvent::new(KeyCode::Up, KeyModifiers::NONE),
+            now + Duration::from_millis(2),
+        );
+
+        assert_eq!(app.current_list().tasks[1].id, second_id);
+        assert_eq!(app.selected_task, Some(first_id));
+        assert!(app.chord_started.is_none());
     }
 
     #[test]
