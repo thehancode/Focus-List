@@ -178,12 +178,42 @@ fn render_header(frame: &mut Frame, app: &App, area: Rect) {
 }
 
 fn render_tabs(frame: &mut Frame, app: &App, area: Rect) {
+    let mut spans = Vec::new();
+    for (index, label) in tab_layout(app, area.width as usize) {
+        let style = match index {
+            Some(index) if index == app.current => Style::new().fg(BG).bg(VIOLET).bold(),
+            Some(_) => Style::new().fg(MUTED).bg(PANEL),
+            None => Style::new().fg(MUTED),
+        };
+        spans.push(Span::styled(label, style));
+    }
+    frame.render_widget(
+        Paragraph::new(Line::from(spans)).style(Style::new().bg(BG)),
+        area,
+    );
+}
+
+pub fn tab_at(app: &App, width: u16, column: u16, row: u16) -> Option<usize> {
+    if row != 1 || column >= width || app.overlay != Overlay::None {
+        return None;
+    }
+    let mut start = 0usize;
+    for (index, label) in tab_layout(app, width as usize) {
+        let end = start + label.chars().count();
+        if (start..end).contains(&(column as usize)) {
+            return index;
+        }
+        start = end;
+    }
+    None
+}
+
+fn tab_layout(app: &App, width: usize) -> Vec<(Option<usize>, String)> {
     let labels: Vec<String> = app
         .lists
         .iter()
         .map(|list| format!(" {} ", list.name))
         .collect();
-    let width = area.width as usize;
     let mut start = app.current;
     let mut used = labels[app.current].chars().count().min(width);
     while start > 0 {
@@ -208,28 +238,20 @@ fn render_tabs(frame: &mut Frame, app: &App, area: Rect) {
         end += 1;
     }
     let right_hidden = end < labels.len();
-    let mut spans = Vec::new();
+    let mut visible = Vec::new();
     if left_hidden {
-        spans.push(Span::styled("‹", Style::new().fg(MUTED)));
+        visible.push((None, "‹".into()));
     }
     for (index, label) in labels.iter().enumerate().take(end).skip(start) {
         let reserved = usize::from(left_hidden) + usize::from(right_hidden);
         let available = width.saturating_sub(reserved);
         let label = truncate(label, available.max(1));
-        let style = if index == app.current {
-            Style::new().fg(BG).bg(VIOLET).bold()
-        } else {
-            Style::new().fg(MUTED).bg(PANEL)
-        };
-        spans.push(Span::styled(label, style));
+        visible.push((Some(index), label));
     }
     if right_hidden {
-        spans.push(Span::styled("›", Style::new().fg(MUTED)));
+        visible.push((None, "›".into()));
     }
-    frame.render_widget(
-        Paragraph::new(Line::from(spans)).style(Style::new().bg(BG)),
-        area,
-    );
+    visible
 }
 
 #[allow(dead_code)]
@@ -1084,6 +1106,19 @@ mod tests {
             .collect::<String>();
         assert!(rendered.contains("Archive"));
         assert!(rendered.contains('‹'));
+    }
+
+    #[test]
+    fn visible_tabs_can_be_hit_tested() {
+        let directory = tempdir().unwrap();
+        let mut app = App::load(directory.path().to_path_buf()).unwrap();
+        app.lists.push(crate::model::TaskList::named("Work"));
+
+        assert_eq!(tab_at(&app, 40, 1, 1), Some(0));
+        assert_eq!(tab_at(&app, 40, 8, 1), Some(1));
+        assert_eq!(tab_at(&app, 40, 8, 0), None);
+        app.overlay = Overlay::Help;
+        assert_eq!(tab_at(&app, 40, 1, 1), None);
     }
 
     #[test]

@@ -122,6 +122,10 @@ impl NativeApp {
                         }
                     }
                 }
+                egui::Event::Cut => self.app.handle_key(
+                    KeyEvent::new(KeyCode::Char('x'), KeyModifiers::CONTROL),
+                    now,
+                ),
                 _ => {}
             }
         }
@@ -152,6 +156,12 @@ impl NativeApp {
             GridHit::Task(task_id) => {
                 if pressed {
                     self.app.selected_task = Some(task_id);
+                }
+            }
+            GridHit::Tab(index) => {
+                ctx.set_cursor_icon(egui::CursorIcon::PointingHand);
+                if pressed {
+                    self.app.select_list(index);
                 }
             }
             GridHit::Content => {}
@@ -303,12 +313,17 @@ enum GridHit {
     Drag,
     Resize(ResizeDirection),
     Task(uuid::Uuid),
+    Tab(usize),
     Content,
 }
 
 fn grid_hit(cell: (u16, u16), size: (u16, u16), app: &App) -> GridHit {
     if let Some(hit) = chrome_hit(cell, size) {
         return hit;
+    }
+
+    if let Some(index) = ui::tab_at(app, size.0, cell.0, cell.1) {
+        return GridHit::Tab(index);
     }
 
     ui::task_at(
@@ -659,5 +674,15 @@ mod tests {
             egui_key(egui::Key::F2, egui::Modifiers::NONE).unwrap().code,
             KeyCode::F(2)
         );
+    }
+
+    #[test]
+    fn tab_rows_hit_the_corresponding_list() {
+        let directory = tempfile::tempdir().unwrap();
+        let mut app = App::load(directory.path().to_path_buf()).unwrap();
+        app.lists.push(tui_kanban::model::TaskList::named("Work"));
+
+        assert_eq!(grid_hit((1, 1), (80, 24), &app), GridHit::Tab(0));
+        assert_eq!(grid_hit((8, 1), (80, 24), &app), GridHit::Tab(1));
     }
 }

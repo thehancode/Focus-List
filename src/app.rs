@@ -242,12 +242,36 @@ impl App {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
                 KeyCode::Char('c') | KeyCode::Char('C') => self.should_quit = true,
-                KeyCode::Char('n') | KeyCode::Char('N') => self.open_add_list(),
-                KeyCode::Char('r') | KeyCode::Char('R') => self.open_rename_list(),
-                KeyCode::Char('x') | KeyCode::Char('X') => self.confirm_delete_current_list(),
+                KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Char('\u{0e}') => {
+                    self.open_add_list()
+                }
+                KeyCode::Char('r') | KeyCode::Char('R') | KeyCode::Char('\u{12}') => {
+                    self.open_rename_list()
+                }
+                KeyCode::Char('x') | KeyCode::Char('X') | KeyCode::Char('\u{18}') => {
+                    self.confirm_delete_current_list()
+                }
                 _ => {}
             }
             return;
+        }
+
+        // Some terminals encode Ctrl+letter directly as an ASCII control
+        // character instead of retaining the CONTROL modifier.
+        match key.code {
+            KeyCode::Char('\u{18}') => {
+                self.confirm_delete_current_list();
+                return;
+            }
+            KeyCode::Char('\u{12}') => {
+                self.open_rename_list();
+                return;
+            }
+            KeyCode::Char('\u{0e}') => {
+                self.open_add_list();
+                return;
+            }
+            _ => {}
         }
 
         match key.code {
@@ -648,6 +672,14 @@ impl App {
         } else {
             (self.current + 1) % self.lists.len()
         };
+        self.reset_after_list_switch();
+    }
+
+    pub fn select_list(&mut self, index: usize) {
+        if index >= self.lists.len() || index == self.current {
+            return;
+        }
+        self.current = index;
         self.reset_after_list_switch();
     }
 
@@ -1423,6 +1455,17 @@ mod tests {
         assert_eq!(app.overlay, Overlay::None);
         assert_eq!(app.lists.len(), 1);
         assert!(app.notice.as_ref().unwrap().error);
+    }
+
+    #[test]
+    fn terminal_control_character_opens_list_deletion() {
+        let mut app = app();
+        app.save_list_prompt(ListPromptKind::Add, "Work".into());
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('\u{18}'), KeyModifiers::NONE),
+            Instant::now(),
+        );
+        assert_eq!(app.overlay, Overlay::ConfirmDeleteList);
     }
 
     #[test]
