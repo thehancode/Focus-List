@@ -1,0 +1,838 @@
+FOCUS LIST: DETAILED FLUTTER MIGRATION PLAN
+===========================================
+
+Purpose and target
+------------------
+
+Migrate the existing Rust Focus List experience into the already-created
+flutter_app project. Version 1 targets Linux desktop, web, and Android, remains
+local-first, and preserves the behavior in 01-current-program-specification.txt.
+Terminal support is intentionally dropped.
+
+The architecture will use:
+
+* MVVM for presentation and interaction state.
+* Riverpod Notifier/AsyncNotifier providers as view-model construction,
+  dependency injection, and observable state. flutter_riverpod is already in
+  pubspec.yaml.
+* Repository interfaces owned by the domain layer.
+* Local repository implementations backed by platform data sources.
+* JSON-compatible DTOs so Linux can reuse/import the current files and all
+  platforms share one serialization contract.
+* A future remote repository/sync layer that can be added without rewriting
+  widgets or business rules.
+
+This is a native Flutter UI, not an emulated Ratatui character buffer. Desktop
+and web should closely preserve the current density, colors, typography,
+keyboard workflow, mode transitions, and feedback. Android should use the same
+domain behavior with touch-friendly controls and a responsive layout.
+
+
+1. ARCHITECTURE DECISIONS
+-------------------------
+
+1.1 Layer responsibilities
+
+Domain layer
+
+* Immutable Task, TaskList, AppSettings, enums, and value types.
+* Repository contracts only; no Flutter imports and no filesystem/browser APIs.
+* Pure task/list operations and query functions where rules are reusable.
+* An injectable Clock so recurrence and history tests do not depend on wall
+  time.
+
+Data layer
+
+* JSON DTOs and mapping to/from domain models.
+* Schema validation and migration.
+* Platform-local data-source interfaces and implementations.
+* Local repository implementations.
+* Later: API DTOs, HTTP client, auth token handling, remote repositories, and a
+  sync coordinator.
+
+Presentation layer (MVVM)
+
+* View models expose immutable UI state and user-intent methods.
+* Widgets render state and dispatch intents; widgets do not directly read/write
+  files, manipulate JSON, or contain status-transition business rules.
+* Dialog-local TextEditingController/FocusNode objects may remain in widgets,
+  while persisted values and submit validation go through view models.
+* A single workspace/session view model coordinates selected list/task, view
+  mode, overlays, chord state, animations, and cross-list navigation.
+
+1.2 Recommended model split
+
+Use immutable Dart classes with explicit copyWith, equality, and JSON mapping.
+Code generation (freezed/json_serializable) is optional but recommended once
+the project is comfortable with build_runner. If avoiding generation initially,
+hand-written models are acceptable as long as tests cover round trips and
+unknown/missing fields.
+
+Do not expose mutable List<Task>. Every state update should create a new list so
+Riverpod reliably notifies widgets and tests can compare states.
+
+1.3 Repository boundaries
+
+Keep separate contracts because lists and settings have different lifecycles:
+
+    abstract interface class TaskListRepository {
+      Future<List<TaskList>> loadAll();
+      Future<void> save(TaskList list);
+      Future<void> delete(TaskListId id);
+      Stream<List<TaskList>> watchAll(); // may initially be a local controller
+    }
+
+    abstract interface class SettingsRepository {
+      Future<AppSettings> load();
+      Future<void> save(AppSettings settings);
+      Stream<AppSettings> watch();
+    }
+
+For version 1, the view model may explicitly save after commands, matching the
+Rust app. A watch API is still valuable for future sync and multiple windows,
+but it can be omitted until it has a real consumer rather than implemented as
+unused abstraction.
+
+Future backend evolution should introduce a composition such as
+SyncingTaskListRepository(local, remote, outbox), not replace the repository
+contract used by view models. Avoid a repository with boolean isRemote branches.
+
+1.4 Preserve ordering for backend readiness
+
+The JSON tasks array remains canonical in version 1. Add a documented domain
+operation for reorderWithinStatus rather than allowing widgets to swap array
+indexes themselves. When a SQL backend is added, map ordering to a stable rank
+or sort_key per task. Prefer fractional/string ranks or spaced integers so one
+move does not rewrite every task in a large list.
+
+1.5 Error and transaction policy
+
+View-model commands should have clear optimistic or pessimistic behavior:
+
+* For small local mutations, build the candidate state, persist it, then publish
+  success state (pessimistic) when latency is negligible.
+* If optimistic updates are desired for web/backend later, retain the prior
+  state and roll back on failure.
+* Never leave UI state claiming a save succeeded when persistence failed.
+* Map data exceptions into user-facing notices plus diagnostic log details.
+
+
+2. PLATFORM STORAGE STRATEGY FOR VERSION 1
+------------------------------------------
+
+2.1 Shared abstraction
+
+Define a LocalTaskListDataSource with operations to enumerate, read, atomically
+write, and delete JSON documents by list UUID. Define a LocalSettingsDataSource
+similarly. Select implementations through conditional imports or platform-aware
+Riverpod providers in data/providers.dart. Domain and presentation code must not
+check kIsWeb.
+
+All platforms must use the same DTO/schema semantics:
+
+* schema_version=1
+* lowercase status strings
+* RFC-3339 UTC timestamps
+* UUID string IDs
+* missing completed_at/daily/completion_history interpreted as null/false/[]
+* one logical JSON document per task list
+
+2.2 Linux desktop
+
+Use dart:io and path/path_provider. For compatibility, first look for the Rust
+location under XDG_DATA_HOME or ~/.local/share/tui-kanban/tasklists. There are
+two safe rollout choices:
+
+* Version 1 compatibility mode: deliberately use the exact current directory.
+* Preferred migration mode: use Flutter's application-support directory and
+  offer a one-time import from the Rust directory, leaving originals untouched
+  until import is verified.
+
+Choose and document one before implementation. The one-time import is safer if
+the Rust and Flutter apps may both be run, because simultaneous writers to the
+same JSON files are unsupported.
+
+Write <uuid>.json.tmp, flush/close, then rename to <uuid>.json. Keep
+config/settings.json. Enumerate only direct .json children for task lists.
+
+2.3 Android
+
+Use path_provider's application-support/documents directory plus dart:io. Keep
+the same one-file-per-list layout and settings JSON. These are private app files
+and do not require broad external-storage permission. Atomic temp-write/rename
+should be used. Android uninstall will remove private local data; backend sync
+or an export feature will eventually address portability.
+
+2.4 Web
+
+dart:io is unavailable. Use IndexedDB, not browser downloads or localStorage, as
+the durable local object store. Store each list as an individual record keyed by
+UUID and settings as a separate record/store. The record value may be the JSON
+map or canonical JSON string; using a map makes inspection easier, while a
+string makes byte-for-byte schema testing easier. Pick one and test it.
+
+Use a maintained IndexedDB wrapper or a cross-platform database package only
+after checking its current Flutter web support. Hide the package entirely behind
+WebTaskListDataSource. Browser storage can be evicted in some conditions and is
+origin/profile-specific, so the UI should eventually expose export/sync; that is
+not required to reach version-1 parity.
+
+2.5 Storage initialization
+
+On startup:
+
+1. Initialize Flutter bindings and desktop window support.
+2. Construct platform data sources and repositories through Riverpod.
+3. Load settings and all task lists asynchronously.
+4. Validate/migrate every document independently.
+5. Surface skipped-document warnings without preventing valid lists from load.
+6. Create and persist "Tasks" if zero valid lists remain.
+7. Reset expired daily tasks for every loaded list (an intentional improvement
+   over the Rust implementation, which checks only the current list), or retain
+   exact current-list-only behavior if strict parity is required. Record this as
+   an explicit product decision and test it.
+8. Show the workspace only after initial state is ready; use branded loading and
+   recoverable error states instead of a blank frame.
+
+
+3. PROPOSED FLUTTER FILE STRUCTURE
+----------------------------------
+
+The following structure is detailed enough for another agent to implement
+incrementally. Files can be consolidated early, but dependencies must continue
+to point inward (presentation -> domain contracts; data -> domain contracts).
+
+flutter_app/
+  lib/
+    main.dart
+    app/
+      focus_list_app.dart
+      app_bootstrap.dart
+      app_theme.dart
+      app_colors.dart
+      app_typography.dart
+      platform.dart
+
+    core/
+      clock/
+        clock.dart
+        system_clock.dart
+      errors/
+        app_exception.dart
+        persistence_exception.dart
+      ids/
+        id_generator.dart
+        uuid_id_generator.dart
+      logging/
+        app_logger.dart
+      utils/
+        date_time_extensions.dart
+        string_normalization.dart
+
+    domain/
+      models/
+        task.dart
+        task_list.dart
+        task_status.dart
+        app_settings.dart
+        long_title_display.dart
+        completion_entry.dart
+      repositories/
+        task_list_repository.dart
+        settings_repository.dart
+      services/
+        task_command_service.dart
+        task_query_service.dart
+        daily_reset_service.dart
+        list_name_service.dart
+      values/
+        task_id.dart
+        task_list_id.dart
+
+    data/
+      dto/
+        task_dto.dart
+        task_list_dto.dart
+        app_settings_dto.dart
+      mapping/
+        task_mapper.dart
+        task_list_mapper.dart
+        settings_mapper.dart
+      migrations/
+        schema_migration.dart
+        schema_v1.dart
+      validation/
+        task_list_validator.dart
+      datasources/
+        local/
+          local_task_list_data_source.dart
+          local_settings_data_source.dart
+          io/
+            io_paths.dart
+            io_atomic_json_writer.dart
+            io_task_list_data_source.dart
+            io_settings_data_source.dart
+            legacy_rust_importer.dart
+          web/
+            web_database.dart
+            web_task_list_data_source.dart
+            web_settings_data_source.dart
+      repositories/
+        local_task_list_repository.dart
+        local_settings_repository.dart
+      providers.dart
+
+    presentation/
+      workspace/
+        workspace_screen.dart
+        workspace_state.dart
+        workspace_view_model.dart
+        workspace_providers.dart
+        view_mode.dart
+        overlay_state.dart
+        widgets/
+          workspace_header.dart
+          list_tab_bar.dart
+          task_panel.dart
+          task_section.dart
+          task_row.dart
+          workspace_footer.dart
+          notice_banner.dart
+          empty_state.dart
+      multi_view/
+        multi_view.dart
+        multi_list_section.dart
+      focus_view/
+        focus_view.dart
+      completed_view/
+        completed_view.dart
+        completion_row.dart
+      task_editor/
+        task_editor_dialog.dart
+        task_editor_state.dart
+        task_editor_view_model.dart
+      list_editor/
+        list_editor_dialog.dart
+        list_editor_state.dart
+        list_editor_view_model.dart
+      settings/
+        settings_dialog.dart
+        settings_state.dart
+        settings_view_model.dart
+      help/
+        shortcut_help_dialog.dart
+      shortcuts/
+        app_intents.dart
+        app_actions.dart
+        shortcut_bindings.dart
+        chord_controller.dart
+      responsive/
+        window_class.dart
+        responsive_workspace.dart
+        desktop_workspace.dart
+        mobile_workspace.dart
+      common/
+        confirm_dialog.dart
+        focus_list_dialog.dart
+        marquee_text.dart
+        app_scroll_behavior.dart
+
+  assets/
+    fonts/
+      UbuntuMonoNerdFontMono-Regular.ttf
+      UbuntuMonoNerdFontMono-Bold.ttf
+
+  test/
+    core/
+    domain/
+      task_command_service_test.dart
+      task_query_service_test.dart
+      daily_reset_service_test.dart
+      list_name_service_test.dart
+    data/
+      dto_json_compatibility_test.dart
+      local_task_list_repository_contract_test.dart
+      io_task_list_data_source_test.dart
+      web_task_list_data_source_test.dart
+      fixtures/
+        rust_task_list_v1.json
+        rust_settings_v1.json
+        malformed_task_list.json
+    presentation/
+      workspace_view_model_test.dart
+      shortcut_bindings_test.dart
+      workspace_screen_test.dart
+      multi_view_test.dart
+      task_editor_dialog_test.dart
+      list_tabs_test.dart
+
+  integration_test/
+    local_first_workflow_test.dart
+    multi_list_workflow_test.dart
+    daily_task_workflow_test.dart
+    keyboard_workflow_test.dart
+
+  web/
+  linux/
+  android/
+
+Future backend additions should fit under:
+
+  lib/data/datasources/remote/
+    api_client.dart
+    auth_api.dart
+    task_list_api.dart
+  lib/data/repositories/
+    syncing_task_list_repository.dart
+  lib/data/sync/
+    sync_engine.dart
+    outbox.dart
+    conflict_resolver.dart
+  lib/presentation/auth/
+
+
+4. VIEW-MODEL DESIGN
+--------------------
+
+4.1 WorkspaceState
+
+WorkspaceState should be immutable and contain at least:
+
+* load status: loading/ready/failure.
+* List<TaskList> lists.
+* currentListId rather than only an array index.
+* selectedTaskId.
+* ViewMode: list, focus, completed, multi.
+* bool returnToMultiAfterFocus.
+* OverlayState or dialog request state.
+* transient NoticeState.
+* TransitionAnimationState.
+* GrabState: idle or armed with an expiry time.
+* AppSettings settings, or settings via a separate watched provider.
+* bool soundEnabled for the session.
+
+Use IDs as stable state. Derive current indexes and selected objects through
+queries. Never store duplicate derived collections such as doingTasks in state;
+derive them with selectors/providers to prevent inconsistency.
+
+4.2 WorkspaceViewModel intent methods
+
+Expose named operations that mirror user intent:
+
+* initialize()
+* selectTask(taskId)
+* moveSelection(delta)
+* selectList(listId)
+* cycleList(direction)
+* toggleMultiView()
+* toggleFocusView()
+* toggleCompletedView()
+* createTask(title, daily)
+* updateSelectedTask(title, daily)
+* duplicateSelectedTask(title, daily)
+* requestDeleteTask() / confirmDeleteTask()
+* advanceSelectedTask()
+* revertSelectedCompletedTask()
+* armGrab() / releaseGrab() / reorderSelected(direction)
+* createList(name)
+* renameCurrentList(name)
+* requestDeleteCurrentList() / confirmDeleteCurrentList()
+* updateSettings(...)
+* dismissNotice()
+
+Keep keyboard event objects out of these methods. Shortcut Actions translate
+keys into the same intents used by buttons, taps, menus, and accessibility
+actions.
+
+4.3 Command serialization
+
+Prevent overlapping asynchronous mutations from losing data. A simple version
+1 solution is a per-workspace command queue or disabling repeated persistence
+commands until the preceding local write completes. Reorder key repeat still
+needs to feel immediate; coalesce rapid reorder saves or serialize them in
+order. Do not allow an older save completion to overwrite a newer list snapshot.
+
+
+5. DESKTOP/WEB UI IMPLEMENTATION
+--------------------------------
+
+5.1 Visual shell
+
+Build a dark, borderless-looking workspace with the current palette and bundled
+Ubuntu Mono Nerd Font. Use normal Flutter widgets so text scales and semantics
+remain accessible. Keep the visual hierarchy:
+
+* Product/view header.
+* Horizontally scrollable tab bar on the second row.
+* One central rounded bordered panel.
+* Feedback and shortcut footer.
+
+Unlike the character-grid preview, use real ScrollController behavior. Whenever
+selection changes, call Scrollable.ensureVisible for the selected task. Use
+stable ValueKeys based on task UUID.
+
+5.2 Tabs
+
+Use a custom tab strip rather than TabBar if needed because Multi view requires
+no selected tab. It must:
+
+* Highlight the current tab only outside Multi.
+* Scroll the current tab into view after keyboard cycling.
+* Select by click/tap and return to List.
+* Support Tab/Shift+Tab list cycling at the workspace shortcut level.
+* Provide create/rename/delete actions through keyboard and accessible menus.
+
+5.3 Task rows
+
+TaskRow should support selection click/tap, focus/semantics, status icon,
+selected styling, Done strike-through, transition pulse, daily indicator if one
+is added, marquee/wrap modes, and stable height transitions.
+
+For parity, Space+arrow reorders within status. Desktop may additionally support
+pointer drag-and-drop, but this should call the same reorderWithinStatus domain
+operation and must not silently reorder across statuses. Treat pointer dragging
+as an enhancement with its own acceptance tests, not a replacement for keys.
+
+5.4 Keyboard system
+
+Use Focus, Shortcuts, Actions, and Intent classes. Put one primary Focus node
+around the workspace and autofocus it after dialogs close. Define shortcuts in
+one testable map.
+
+Important details:
+
+* Handle key down, repeat, and key up for Space. Key up must release grab.
+* Arm for 750 ms and refresh after each reorder/repeat.
+* Do not trigger workspace shortcuts while a text field or modal owns focus.
+* Use SingleActivator with control/meta choices appropriate to platform.
+* Prevent printable-key handling from inserting duplicate characters.
+* Browser/OS reserved shortcuts (notably Ctrl+N, Ctrl+R, and sometimes Ctrl+W)
+  may not be delivered reliably. Implement them where Flutter receives them,
+  call preventDefault when the platform permits, and always expose clickable
+  commands/tooltips as the web fallback. Do not claim guaranteed interception
+  of browser-reserved commands.
+* Android hardware keyboards should use the same bindings where available.
+
+5.5 Dialogs and editing
+
+Use modal dialogs for task/list editors, confirmations, settings, and help.
+TextField already provides robust Unicode cursor editing and selection; configure
+multiline task editing and single-line list naming. Enter-save semantics need
+care on multiline fields: use a documented modifier for inserting a manual
+newline or deliberately retain current Enter-save behavior. Since saved titles
+normalize whitespace today, manual lines are only transient; parity favors
+Enter to save.
+
+Validation errors should remain inside/open above the dialog so the user can
+correct input. Confirm destructive actions explicitly. The final list cannot be
+deleted.
+
+5.6 Marquee and animation
+
+Implement MarqueeText with an AnimationController or timer that runs only for
+the selected overflowing row. It should pause/dispose offscreen and honor the
+50..1000 ms setting. Unselected long text truncates with ellipsis. Wrap mode
+uses normal wrapping while preserving selection and scroll-to-visible behavior.
+
+Implement the 220 ms status pulse with an AnimationController and tween between
+violet and the destination status color. Avoid a global 30 FPS repaint when the
+UI is idle.
+
+
+6. ANDROID EXPERIENCE
+---------------------
+
+Retain the same lists, modes, persistence, status transitions, recurrence, and
+history. Adapt controls rather than forcing terminal density onto touch:
+
+* Use a top app bar with list/view title and overflow actions.
+* Keep a horizontally scrollable list-tab strip.
+* Use comfortably sized task rows and touch targets.
+* Tap selects/opens the primary task action according to a deliberate product
+  choice; avoid surprising status changes on an accidental tap.
+* Provide explicit edit, advance, duplicate, and delete actions through swipe,
+  trailing buttons, context menu, or a task detail/bottom sheet.
+* Use long-press plus ReorderableListView or drag handles for sorting within a
+  status. Enforce the same status-group constraint in the domain layer.
+* Use a floating or app-bar action for new task and a menu for list management.
+* Replace the always-visible shortcut footer with contextual feedback/snackbar
+  and an optional hardware-keyboard help panel.
+* Preserve Multi view as vertically stacked list/status sections.
+* Use system text dictation initially; it comes through the normal text field.
+  Actual stored audio notes are a future model/repository feature and should not
+  be conflated with speech-to-text keyboard input.
+
+Define responsive breakpoints by available width and input modality, not by
+checking only "Android". A tablet with keyboard can use the desktop layout.
+
+
+7. BACKEND-READY LOCAL-FIRST DESIGN
+-----------------------------------
+
+7.1 Identity and timestamps
+
+Generate UUIDs client-side so offline-created objects can sync later. Continue
+storing UTC timestamps and convert only for display/daily-calendar comparisons.
+Consider adding revision, deleted_at tombstone, and sort_key only when backend
+sync begins; do not alter schema version 1 casually.
+
+7.2 Sync preparation without premature sync code
+
+Version 1 should not implement a fake sync engine. It should ensure:
+
+* Widgets depend only on view models.
+* View models depend only on repository contracts.
+* DTO/schema code is isolated.
+* Every mutation has a named command and deterministic result.
+* IDs are stable and collisions across lists are treated as invalid.
+* Ordering is explicit.
+* Repository contract tests can be rerun against a future remote/syncing
+  implementation.
+
+7.3 Later sync model
+
+When the backend arrives, use local-first reads and an outbox of mutation
+operations. The sync repository writes locally and queues operations, then a
+sync engine sends them after authentication/network availability. The server
+returns authoritative revisions. Define conflict policy per field/operation;
+do not use last-write-wins blindly for reorder and delete.
+
+Google authentication belongs in an AuthRepository/AuthViewModel. Repositories
+should receive a session/token provider and user scope, not import Google Sign
+In directly throughout the app.
+
+
+8. DEPENDENCY PLAN
+------------------
+
+Already present:
+
+* flutter_riverpod: state, dependency injection, view models.
+* window_manager: Linux window sizing/management.
+
+Likely additions, with current platform support/version verified at the time of
+implementation:
+
+* path and path_provider: IO platform data directories and paths.
+* uuid: IDs.
+* intl: local completion timestamps/calendar formatting.
+* An IndexedDB-capable package for web, hidden behind the web data source.
+* Optional freezed, json_annotation, build_runner, and json_serializable for
+  immutable models/DTO serialization.
+* Optional fake_async and clock-style abstraction for chord/daily tests.
+
+Avoid selecting one database package merely to share implementation across all
+platforms if it compromises Linux JSON compatibility. The repository/data-source
+boundary is the portability mechanism.
+
+Add the bundled fonts under flutter/assets/fonts and declare regular/bold
+weights in pubspec.yaml. Confirm the existing Ubuntu font license remains in
+distributed assets/notices.
+
+
+9. PHASED IMPLEMENTATION PLAN
+-----------------------------
+
+Phase 0: Baseline and decisions
+
+1. Run flutter analyze, flutter test, and smoke builds for Linux/web/Android.
+2. Record the current Flutter/Dart versions and supported deployment targets.
+3. Decide Linux shared-directory versus one-time import.
+4. Decide whether version-1 daily reset checks all lists or only current list.
+5. Capture screenshots/fixtures from the Rust UI and copy representative Rust
+   JSON/settings files into test fixtures.
+
+Exit criteria: scaffold is green and the two explicit compatibility decisions
+are written in flutter_app/README.md or an architecture decision record.
+
+Phase 1: Domain model and pure behavior
+
+1. Add TaskStatus, Task, TaskList, AppSettings, CompletionEntry, IDs, Clock, and
+   ID generator.
+2. Implement normalization, status cycle, queries for every view, completion
+   history sorting, daily reset, list-name validation, and reorder-within-status.
+3. Port Rust behavioral tests into Dart unit tests, including Multi transitions
+   and Space reorder semantics at the command level.
+
+Exit criteria: pure Dart tests reproduce all data/state rules without Flutter
+widgets or persistence.
+
+Phase 2: DTOs, schema, and local repositories
+
+1. Implement v1 JSON DTOs and mappings.
+2. Add fixture tests proving Rust JSON decodes and re-encodes compatibly.
+3. Implement IO data sources for Linux/Android with atomic writes.
+4. Implement IndexedDB data sources for web.
+5. Implement repositories and shared contract tests.
+6. Implement invalid-file warnings, duplicate ID/name handling, default "Tasks",
+   and legacy Linux import/migration according to Phase 0 decisions.
+
+Exit criteria: repository contract tests pass for IO and web implementations;
+manual restarts preserve edits on all three targets.
+
+Phase 3: Workspace MVVM
+
+1. Replace the smoke taskCountProvider with repository providers and
+   WorkspaceViewModel.
+2. Implement async startup, selection, view queries, list switching, all task
+   commands, all list commands, notices, and persistence sequencing.
+3. Add deterministic tests for mode transitions and failures/rollback.
+
+Exit criteria: view-model tests cover the full command matrix and no widget
+imports a data source.
+
+Phase 4: Desktop/web visual parity
+
+1. Add theme, fonts, header, tabs, List/Focus/Completed/Multi panels, rows,
+   scrolling, footer, empty/loading/error states.
+2. Add clickable task selection and tabs.
+3. Add editor/list/settings/help/delete dialogs.
+4. Add marquee/wrap and transition animation.
+5. Add window sizing and, if still desired, borderless drag/resize behavior on
+   Linux using window_manager capabilities.
+
+Exit criteria: golden/widget tests cover the four modes, overflow tabs, long
+titles, dialogs, small layouts, and selected-row scrolling.
+
+Phase 5: Keyboard parity
+
+1. Implement central Shortcuts/Actions/Intents.
+2. Implement Space key-down/repeat/up chord controller and 750 ms expiry.
+3. Restore focus after every modal and pointer action.
+4. Verify browser-reserved shortcut limitations and visible fallbacks.
+5. Test with Linux and web physical keyboards plus Android emulator hardware-key
+   input.
+
+Exit criteria: the keyboard acceptance matrix below passes and releasing Space
+always ends grab.
+
+Phase 6: Android responsive UX
+
+1. Implement mobile workspace shell and touch actions.
+2. Add constrained drag reorder within status.
+3. Validate keyboard/dictation input, back navigation, dialogs, rotation, text
+   scaling, and small screens.
+4. Verify app-private persistence across process death and upgrade.
+
+Exit criteria: all core workflows are possible without a hardware keyboard and
+remain consistent with domain behavior.
+
+Phase 7: Hardening and release preparation
+
+1. Run analyzer, unit/widget/integration tests, and all three release builds.
+2. Test malformed/corrupt data, disk/storage failures, web reload/offline use,
+   Android process death, timezone/day rollover, very large lists, Unicode, and
+   rapid repeated reorder commands.
+3. Add accessible labels, keyboard focus indicators, contrast checks, and
+   reduced-motion behavior.
+4. Document data paths, backup/export limitations, import, and known browser
+   shortcut constraints.
+
+Exit criteria: parity checklist is signed off and no P0/P1 data-loss issue is
+open.
+
+
+10. ACCEPTANCE TEST MATRIX
+--------------------------
+
+Data and persistence
+
+* Empty storage creates exactly one "Tasks" list.
+* Multiple UUID JSON lists round-trip without merging.
+* Existing Rust v1 JSON loads with omitted default fields.
+* Malformed documents are skipped and reported while valid data opens.
+* Names are unique ignoring case and normalized on create/rename.
+* Every successful mutation survives restart/reload.
+* Deleting one list never deletes another; last list cannot be deleted.
+
+Task behavior
+
+* New/edited titles normalize whitespace and reject empty input.
+* Duplicate copies title/daily only and generates new identity/timestamps.
+* Status cycles Pending -> Doing -> Done -> Pending.
+* completed_at and daily completion_history follow the exact rules in the
+  specification.
+* Reorder can traverse more than two positions while Space is held.
+* Reorder affects only the selected status group and persists canonical order.
+* Space release immediately converts the next arrow back to selection movement.
+
+Views and selection
+
+* List is Doing/Pending/Done and preserves order.
+* Focus contains Doing only and follows automatic transition rules.
+* Completed entries are newest first and include repeated daily completions.
+* Multi omits Done/empty lists, uses list then Doing/Pending order, and selection
+  crosses list boundaries while updating owning-list context.
+* Pending -> Doing from Multi enters Focus; Doing -> Done returns to Multi.
+* Clicking/tapping a tab from Multi returns to that list's List view.
+* Selection stays visible during keyboard movement and wrapping.
+
+Inputs and overlays
+
+* All shortcuts in the specification work on Linux desktop.
+* Supported shortcuts work on web/Android hardware keyboards; reserved browser
+  commands have visible pointer alternatives.
+* Modal input blocks workspace shortcuts.
+* Task/list clicks select the correct item.
+* Destructive confirmation cancel and confirm paths work.
+* App focus returns to the workspace after closing a modal.
+
+Responsive and accessibility
+
+* Desktop and wide web preserve the compact keyboard-first experience.
+* Narrow web and Android expose every action through touch.
+* Text scaling does not hide destructive confirmation or save/cancel controls.
+* Screen readers announce list, status, task title, selected state, and actions.
+
+
+11. KNOWN RISKS AND MITIGATIONS
+-------------------------------
+
+Risk: Browser consumes Ctrl+N/Ctrl+R.
+Mitigation: implement shortcuts where delivered and supply obvious tab/menu
+buttons plus shortcut tooltips. Do not base essential web usability on reserved
+keys.
+
+Risk: Concurrent saves finish out of order during rapid reorder.
+Mitigation: serialize/coalesce writes per list and test delayed repositories.
+
+Risk: Running Rust and Flutter against the same Linux files causes lost updates.
+Mitigation: prefer one-time copy/import, or explicitly prevent/support only one
+writer and document it.
+
+Risk: Daily reset depends on timezone and whether a list is open.
+Mitigation: inject Clock/timezone behavior, decide all-list versus current-list
+parity, and test midnight/timezone changes.
+
+Risk: IndexedDB and file stores have different failure semantics.
+Mitigation: repository contract tests plus platform integration tests; never let
+widgets depend on storage details.
+
+Risk: A full MVVM/domain/data tree becomes ceremony for a small app.
+Mitigation: keep interfaces at real boundaries, colocate small files initially,
+and split only when responsibilities emerge. Preserve dependency direction even
+if the physical tree starts smaller.
+
+Risk: Future backend order conflicts.
+Mitigation: make reorder a named operation now and introduce stable sort ranks,
+revisions, and conflict policy when sync is designed.
+
+
+12. INSTRUCTIONS FOR A FUTURE IMPLEMENTING AGENT
+------------------------------------------------
+
+1. Read 01-current-program-specification.txt completely before editing Flutter.
+2. Inspect the current Rust tests whenever a behavior is ambiguous.
+3. Preserve the existing flutter_app platform scaffolding and unrelated user
+   changes.
+4. Work phase by phase; keep flutter analyze and flutter test green after each.
+5. Do not connect widgets directly to files, IndexedDB, or future HTTP clients.
+6. Do not replace the canonical task-order rule with alphabetical/timestamp
+   sorting.
+7. Test persistence failures and rapid commands, not only happy paths.
+8. Record deliberate behavior changes as decisions instead of accidentally
+   diverging from Rust.
+9. Build and smoke-test Linux, web, and Android at milestone boundaries.
+10. Do not add backend auth/sync or stored audio notes until local parity is
+    stable; prepare boundaries for them, but keep version 1 scope controlled.
+
