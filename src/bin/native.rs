@@ -52,7 +52,7 @@ fn main() -> Result<()> {
         ..Default::default()
     };
     eframe::run_native(
-        "Kanban",
+        "Focus List",
         options,
         Box::new(move |creation_context| {
             install_fonts(&creation_context.egui_ctx);

@@ -45,5 +45,5 @@ if command -v update-desktop-database >/dev/null 2>&1; then
     update-desktop-database "$applications_dir" >/dev/null 2>&1 || true
 fi
 
-echo "Installed native TUI Kanban. It will open automatically at the next login."
+echo "Installed Focus List. It will open automatically at the next login."
 echo "Future updates: $repo_dir/scripts/install-native.sh"

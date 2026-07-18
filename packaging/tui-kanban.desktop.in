@@ -1,12 +1,12 @@
 [Desktop Entry]
 Type=Application
-Name=TUI Kanban
+Name=Focus List
 GenericName=Task List
-Comment=Open the native Kanban task list
+Comment=Open your keyboard-first task list
 Exec=@HOME@/.local/bin/tui-kanban-native
 Icon=tui-kanban
 Terminal=false
 Categories=Office;
 StartupNotify=true
-StartupWMClass=kanban
-Keywords=kanban;tasks;todo;
+StartupWMClass=focus-list
+Keywords=focus;tasks;todo;

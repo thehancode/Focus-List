@@ -23,6 +23,7 @@ const AMBER: Color = Color::Rgb(249, 191, 96);
 const CYAN: Color = Color::Rgb(93, 211, 220);
 const GREEN: Color = Color::Rgb(125, 207, 145);
 const RED: Color = Color::Rgb(244, 112, 122);
+const HEADER_HEIGHT: u16 = 1;
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -34,7 +35,7 @@ pub fn render(frame: &mut Frame, app: &App) {
     }
 
     let layout = Layout::vertical([
-        Constraint::Length(3),
+        Constraint::Length(HEADER_HEIGHT),
         Constraint::Min(5),
         Constraint::Length(2),
     ])
@@ -76,7 +77,7 @@ pub fn task_at(app: &App, area: Rect, column: u16, row: u16) -> Option<Uuid> {
     }
 
     let body = Layout::vertical([
-        Constraint::Length(3),
+        Constraint::Length(HEADER_HEIGHT),
         Constraint::Min(5),
         Constraint::Length(2),
     ])
@@ -146,39 +147,23 @@ fn list_task_at(app: &App, inner: Rect, visible_row: usize) -> Option<Uuid> {
 }
 
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
-    let list = app.current_list();
-    let counts = |status| {
-        list.tasks
-            .iter()
-            .filter(|task| task.status == status)
-            .count()
-    };
-    let title = Line::from(vec![
-        Span::styled("  KANBAN ", Style::new().fg(BG).bg(VIOLET).bold()),
-        Span::styled(format!("  {}  ", list.name), Style::new().fg(TEXT).bold()),
-    ]);
     let view = match app.view {
-        ViewMode::List => "list",
-        ViewMode::Focus => "doing focus",
-        ViewMode::Completed => "completed",
+        ViewMode::List => "LIST VIEW",
+        ViewMode::Focus => "DOING FOCUS",
+        ViewMode::Completed => "COMPLETED",
     };
-    let summary = Line::from(vec![
-        Span::styled(
-            format!("  ● {} ", counts(Status::Doing)),
-            Style::new().fg(CYAN),
-        ),
-        Span::styled(
-            format!("◌ {} ", counts(Status::Pending)),
-            Style::new().fg(AMBER),
-        ),
-        Span::styled(
-            format!("✓ {}", counts(Status::Done)),
-            Style::new().fg(GREEN),
-        ),
-        Span::styled(format!("   {view} view"), Style::new().fg(MUTED)),
-    ]);
+    let title = " FOCUS LIST ";
+    let view = format!(" {view} ");
+    let spacing = area
+        .width
+        .saturating_sub((title.chars().count() + view.chars().count()) as u16);
     frame.render_widget(
-        Paragraph::new(vec![title, summary]).style(Style::new().bg(BG)),
+        Paragraph::new(Line::from(vec![
+            Span::styled(title, Style::new().fg(BG).bg(VIOLET).bold()),
+            Span::raw(" ".repeat(spacing as usize)),
+            Span::styled(view, Style::new().fg(MUTED).bold()),
+        ]))
+        .style(Style::new().bg(BG)),
         area,
     );
 }
@@ -336,10 +321,7 @@ fn render_focus(frame: &mut Frame, app: &App, area: Rect) {
 fn render_completed(frame: &mut Frame, app: &App, area: Rect) {
     let outer = area.inner(Margin::new(1, 0));
     let block = Block::new()
-        .title(Line::styled(
-            " COMPLETED · NEWEST FIRST ",
-            Style::new().fg(GREEN).bold(),
-        ))
+        .title(Line::styled(" COMPLETED ", Style::new().fg(GREEN).bold()))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(GREEN))
@@ -745,7 +727,7 @@ fn render_confirm(frame: &mut Frame, area: Rect) {
 
 fn render_too_small(frame: &mut Frame, area: Rect) {
     frame.render_widget(
-        Paragraph::new("KANBAN\n\nTerminal too small\nResize to at least 30 × 20")
+        Paragraph::new("FOCUS LIST\n\nTerminal too small\nResize to at least 30 × 20")
             .alignment(Alignment::Center)
             .style(Style::new().fg(VIOLET).bg(BG).bold()),
         area,
@@ -912,14 +894,14 @@ mod tests {
         app.current_list_mut().tasks.push(task);
 
         let area = Rect::new(0, 0, 30, 20);
-        // The empty Doing section occupies rows 4..6, the Pending heading is
-        // row 7, and this task begins on row 8. Continuations are clickable.
-        assert_eq!(task_at(&app, area, 4, 8), Some(task_id));
-        assert_eq!(task_at(&app, area, 4, 9), Some(task_id));
-        assert_eq!(task_at(&app, area, 4, 7), None);
+        // The empty Doing section occupies rows 2..4, the Pending heading is
+        // row 5, and this task begins on row 6. Continuations are clickable.
+        assert_eq!(task_at(&app, area, 4, 6), Some(task_id));
+        assert_eq!(task_at(&app, area, 4, 7), Some(task_id));
+        assert_eq!(task_at(&app, area, 4, 5), None);
 
         app.overlay = Overlay::Help;
-        assert_eq!(task_at(&app, area, 4, 8), None);
+        assert_eq!(task_at(&app, area, 4, 6), None);
     }
 
     #[test]

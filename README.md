@@ -1,6 +1,6 @@
-# tui-kanban
+# Focus List
 
-A small, colorful terminal task list with a main list, Doing focus, and completed history.
+A small, colorful keyboard-first task list with a main list, Doing focus, and completed history.
 
 ## Run
 

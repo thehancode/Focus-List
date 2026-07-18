@@ -2,7 +2,7 @@
 name = "tui-kanban"
 version = "0.1.0"
 edition = "2024"
-description = "A small, colorful terminal task list"
+description = "Focus List, a small and colorful keyboard-first task list"
 license = "MIT"
 
 [dependencies]
