@@ -24,6 +24,7 @@ pub enum ViewMode {
     List,
     Focus,
     Completed,
+    Multi,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +84,7 @@ pub struct App {
     pub current: usize,
     pub selected_task: Option<Uuid>,
     pub view: ViewMode,
+    pub multi_focus_return: bool,
     pub overlay: Overlay,
     pub bell_enabled: bool,
     terminal_bell_enabled: bool,
@@ -122,6 +124,7 @@ impl App {
             current: 0,
             selected_task: None,
             view: ViewMode::List,
+            multi_focus_return: false,
             overlay: Overlay::None,
             bell_enabled: true,
             terminal_bell_enabled: true,
@@ -242,6 +245,9 @@ impl App {
         if key.modifiers.contains(KeyModifiers::CONTROL) {
             match key.code {
                 KeyCode::Char('c') | KeyCode::Char('C') => self.should_quit = true,
+                KeyCode::Char('a') | KeyCode::Char('A') | KeyCode::Char('\u{01}') => {
+                    self.toggle_multi_view()
+                }
                 KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Char('\u{0e}') => {
                     self.open_add_list()
                 }
@@ -259,6 +265,10 @@ impl App {
         // Some terminals encode Ctrl+letter directly as an ASCII control
         // character instead of retaining the CONTROL modifier.
         match key.code {
+            KeyCode::Char('\u{01}') => {
+                self.toggle_multi_view();
+                return;
+            }
             KeyCode::Char('\u{18}') => {
                 self.confirm_delete_current_list();
                 return;
@@ -325,6 +335,7 @@ impl App {
             KeyCode::Char('?') => self.overlay = Overlay::Help,
             KeyCode::Char('g') => self.overlay = Overlay::Settings { selected: 0 },
             KeyCode::Char('c') => {
+                self.multi_focus_return = false;
                 self.view = if self.view == ViewMode::Focus {
                     ViewMode::List
                 } else if self.tasks_for_status(Status::Doing).next().is_some() {
@@ -343,6 +354,7 @@ impl App {
                 );
             }
             KeyCode::Char('v') => {
+                self.multi_focus_return = false;
                 self.view = if self.view == ViewMode::Completed {
                     ViewMode::List
                 } else {
@@ -676,15 +688,28 @@ impl App {
     }
 
     pub fn select_list(&mut self, index: usize) {
-        if index >= self.lists.len() || index == self.current {
+        if index >= self.lists.len() {
             return;
         }
         self.current = index;
         self.reset_after_list_switch();
     }
 
+    fn toggle_multi_view(&mut self) {
+        self.view = if self.view == ViewMode::Multi {
+            ViewMode::List
+        } else {
+            ViewMode::Multi
+        };
+        self.multi_focus_return = false;
+        self.chord_started = None;
+        self.animation = None;
+        self.select_first();
+    }
+
     fn reset_after_list_switch(&mut self) {
         self.view = ViewMode::List;
+        self.multi_focus_return = false;
         self.chord_started = None;
         self.animation = None;
         self.select_first();
@@ -792,6 +817,7 @@ impl App {
 
     fn advance_status(&mut self, now: Instant) {
         let Some(id) = self.selected_task else { return };
+        let from_multi = self.view == ViewMode::Multi;
         let Some(task) = self
             .current_list_mut()
             .tasks
@@ -815,7 +841,14 @@ impl App {
             });
         }
         if to == Status::Doing {
+            self.multi_focus_return = from_multi;
             self.view = ViewMode::Focus;
+        } else if from == Status::Doing
+            && to == Status::Done
+            && (self.multi_focus_return || from_multi)
+        {
+            self.view = ViewMode::Multi;
+            self.multi_focus_return = false;
         } else if from == Status::Doing
             && to == Status::Done
             && self.tasks_for_status(Status::Doing).next().is_none()
@@ -829,6 +862,9 @@ impl App {
             started: now,
         });
         self.save_current(&format!("{} → {}", from.label(), to.label()));
+        if self.view == ViewMode::Multi && to == Status::Done {
+            self.select_first();
+        }
         if self.bell_enabled && self.terminal_bell_enabled {
             let _ = emit_bell(&mut io::stdout());
         }
@@ -864,8 +900,8 @@ impl App {
         let Some(id) = self.selected_task else { return };
         self.current_list_mut().tasks.retain(|task| task.id != id);
         self.overlay = Overlay::None;
-        self.select_first();
         self.save_current("Task deleted");
+        self.select_first();
     }
 
     fn save_current(&mut self, success: &str) {
@@ -890,6 +926,7 @@ impl App {
 
     fn select_first(&mut self) {
         self.selected_task = self.visible_task_ids().first().copied();
+        self.sync_current_to_selection();
     }
 
     pub fn visible_task_ids(&self) -> Vec<Uuid> {
@@ -906,6 +943,20 @@ impl App {
                 .completion_entries()
                 .into_iter()
                 .map(|(task, _)| task.id)
+                .collect(),
+            ViewMode::Multi => self
+                .lists
+                .iter()
+                .flat_map(|list| {
+                    [Status::Doing, Status::Pending]
+                        .into_iter()
+                        .flat_map(move |status| {
+                            list.tasks
+                                .iter()
+                                .filter(move |task| task.status == status)
+                                .map(|task| task.id)
+                        })
+                })
                 .collect(),
         }
     }
@@ -998,6 +1049,29 @@ impl App {
             .and_then(|id| ids.iter().position(|candidate| *candidate == id))
             .unwrap_or(0);
         self.selected_task = Some(ids[move_index(position, delta, ids.len())]);
+        self.sync_current_to_selection();
+    }
+
+    fn sync_current_to_selection(&mut self) {
+        let Some(id) = self.selected_task else { return };
+        if let Some(index) = self
+            .lists
+            .iter()
+            .position(|list| list.tasks.iter().any(|task| task.id == id))
+        {
+            self.current = index;
+        }
+    }
+
+    pub fn select_task(&mut self, id: Uuid) {
+        if self
+            .lists
+            .iter()
+            .any(|list| list.tasks.iter().any(|task| task.id == id))
+        {
+            self.selected_task = Some(id);
+            self.sync_current_to_selection();
+        }
     }
 }
 
@@ -1466,6 +1540,128 @@ mod tests {
             Instant::now(),
         );
         assert_eq!(app.overlay, Overlay::ConfirmDeleteList);
+    }
+
+    #[test]
+    fn control_a_toggles_multi_view_and_selects_across_lists() {
+        let mut app = app();
+        let first = Task::new("First list task");
+        let first_id = first.id;
+        app.current_list_mut().tasks.push(first);
+        app.save_list_prompt(ListPromptKind::Add, "Work".into());
+        let second = Task::new("Second list task");
+        let second_id = second.id;
+        app.current_list_mut().tasks.push(second);
+        let now = Instant::now();
+
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+            now,
+        );
+        assert_eq!(app.view, ViewMode::Multi);
+        assert_eq!(app.selected_task, Some(first_id));
+        assert_eq!(app.current, 0);
+        app.handle_key(
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+            now + Duration::from_millis(1),
+        );
+        assert_eq!(app.selected_task, Some(second_id));
+        assert_eq!(app.current, 1);
+
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char('a'), KeyModifiers::CONTROL),
+            now + Duration::from_millis(2),
+        );
+        assert_eq!(app.view, ViewMode::List);
+    }
+
+    #[test]
+    fn multi_view_omits_done_tasks_and_orders_doing_before_pending_per_list() {
+        let mut app = app();
+        let pending = Task::new("Pending");
+        let pending_id = pending.id;
+        let mut doing = Task::new("Doing");
+        doing.status = Status::Doing;
+        let doing_id = doing.id;
+        let mut done = Task::new("Done");
+        done.status = Status::Done;
+        app.current_list_mut().tasks.extend([pending, doing, done]);
+        app.view = ViewMode::Multi;
+
+        assert_eq!(app.visible_task_ids(), vec![doing_id, pending_id]);
+    }
+
+    #[test]
+    fn task_advanced_from_multi_focus_returns_to_multi_when_completed() {
+        let mut app = app();
+        let task = Task::new("Advance me");
+        let id = task.id;
+        app.current_list_mut().tasks.push(task);
+        app.view = ViewMode::Multi;
+        app.selected_task = Some(id);
+        app.bell_enabled = false;
+        let now = Instant::now();
+
+        app.advance_status(now);
+        assert_eq!(app.view, ViewMode::Focus);
+        assert!(app.multi_focus_return);
+        app.advance_status(now + Duration::from_millis(1));
+        assert_eq!(app.view, ViewMode::Multi);
+        assert_eq!(app.current_list().tasks[0].status, Status::Done);
+        assert!(!app.multi_focus_return);
+    }
+
+    #[test]
+    fn clicking_the_current_tab_exits_multi_view() {
+        let mut app = app();
+        app.view = ViewMode::Multi;
+        app.select_list(app.current);
+        assert_eq!(app.view, ViewMode::List);
+    }
+
+    #[test]
+    fn multi_view_actions_modify_the_selected_tasks_owning_list() {
+        let mut app = app();
+        app.current_list_mut().tasks.push(Task::new("Personal"));
+        app.save_list_prompt(ListPromptKind::Add, "Work".into());
+        let first = Task::new("Work first");
+        let first_id = first.id;
+        let second = Task::new("Work second");
+        app.current_list_mut().tasks.extend([first, second]);
+        app.view = ViewMode::Multi;
+        app.select_first();
+        let now = Instant::now();
+
+        app.handle_key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE), now);
+        assert_eq!(app.selected_task, Some(first_id));
+        assert_eq!(app.current_list().name, "Work");
+        app.handle_key(
+            KeyEvent::new(KeyCode::Char(' '), KeyModifiers::NONE),
+            now + Duration::from_millis(1),
+        );
+        app.handle_key(
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+            now + Duration::from_millis(2),
+        );
+        assert_eq!(app.current_list().tasks[1].id, first_id);
+
+        app.save_prompt(PromptKind::EditTask, "Edited work task".into(), false);
+        assert_eq!(app.selected().unwrap().title, "Edited work task");
+        app.delete_selected();
+        assert_eq!(app.lists[0].tasks[0].title, "Personal");
+        assert_eq!(app.lists[1].tasks.len(), 1);
+        assert_eq!(
+            app.store
+                .load()
+                .unwrap()
+                .lists
+                .iter()
+                .find(|list| list.name == "Work")
+                .unwrap()
+                .tasks
+                .len(),
+            1
+        );
     }
 
     #[test]

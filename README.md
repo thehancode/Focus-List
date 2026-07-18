@@ -41,6 +41,7 @@ Settings are stored beside it in `config/settings.json`; the default is:
 | Key | Action |
 | --- | --- |
 | `Tab` / `Shift+Tab` | Cycle forward/backward through task lists |
+| `Ctrl+A` | Toggle Multi view for Doing and Pending tasks across every list |
 | `Ctrl+N` | Create and switch to a new task list |
 | `F2`, `Ctrl+R` | Rename the current task list |
 | `Ctrl+X` | Delete the current task list after confirmation |

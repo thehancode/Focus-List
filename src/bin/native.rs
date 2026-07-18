@@ -155,7 +155,7 @@ impl NativeApp {
             }
             GridHit::Task(task_id) => {
                 if pressed {
-                    self.app.selected_task = Some(task_id);
+                    self.app.select_task(task_id);
                 }
             }
             GridHit::Tab(index) => {
@@ -450,6 +450,7 @@ fn egui_key(key: egui::Key, modifiers: egui::Modifiers) -> Option<KeyEvent> {
         egui::Key::Delete => KeyCode::Delete,
         egui::Key::Space => KeyCode::Char(' '),
         egui::Key::C if modifiers.ctrl || modifiers.command => KeyCode::Char('c'),
+        egui::Key::A if modifiers.ctrl || modifiers.command => KeyCode::Char('a'),
         egui::Key::N if modifiers.ctrl || modifiers.command => KeyCode::Char('n'),
         egui::Key::R if modifiers.ctrl || modifiers.command => KeyCode::Char('r'),
         egui::Key::X if modifiers.ctrl || modifiers.command => KeyCode::Char('x'),
@@ -659,6 +660,7 @@ mod tests {
     #[test]
     fn list_shortcuts_preserve_modifiers() {
         for (source, expected) in [
+            (egui::Key::A, KeyCode::Char('a')),
             (egui::Key::N, KeyCode::Char('n')),
             (egui::Key::R, KeyCode::Char('r')),
             (egui::Key::X, KeyCode::Char('x')),

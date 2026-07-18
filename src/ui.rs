@@ -46,6 +46,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         ViewMode::List => render_list(frame, app, layout[1]),
         ViewMode::Focus => render_focus(frame, app, layout[1]),
         ViewMode::Completed => render_completed(frame, app, layout[1]),
+        ViewMode::Multi => render_multi(frame, app, layout[1]),
     }
     render_footer(frame, app, layout[2]);
 
@@ -119,6 +120,7 @@ pub fn task_at(app: &App, area: Rect, column: u16, row: u16) -> Option<Uuid> {
             let scroll = selected_row.saturating_sub(inner.height.saturating_sub(1) as usize);
             entries.get(scroll + visible_row).map(|(task, _)| task.id)
         }
+        ViewMode::Multi => multi_task_at(app, inner, visible_row),
     }
 }
 
@@ -153,11 +155,50 @@ fn list_task_at(app: &App, inner: Rect, visible_row: usize) -> Option<Uuid> {
     rows.get(scroll + visible_row).copied().flatten()
 }
 
+fn multi_task_at(app: &App, inner: Rect, visible_row: usize) -> Option<Uuid> {
+    let mut rows = Vec::new();
+    for list in &app.lists {
+        let has_visible = list
+            .tasks
+            .iter()
+            .any(|task| matches!(task.status, Status::Doing | Status::Pending));
+        if !has_visible {
+            continue;
+        }
+        rows.push(None); // list heading
+        for status in [Status::Doing, Status::Pending] {
+            let tasks: Vec<_> = list
+                .tasks
+                .iter()
+                .filter(|task| task.status == status)
+                .collect();
+            if tasks.is_empty() {
+                continue;
+            }
+            rows.push(None); // status heading
+            for task in tasks {
+                rows.extend(std::iter::repeat_n(
+                    Some(task.id),
+                    task_lines(app, task, inner.width.saturating_sub(3) as usize).len(),
+                ));
+            }
+        }
+        rows.push(None); // list spacing
+    }
+    let selected_line = rows
+        .iter()
+        .position(|id| *id == app.selected_task)
+        .unwrap_or(0);
+    let scroll = selected_line.saturating_sub(inner.height.saturating_sub(1) as usize);
+    rows.get(scroll + visible_row).copied().flatten()
+}
+
 fn render_header(frame: &mut Frame, app: &App, area: Rect) {
     let view = match app.view {
         ViewMode::List => "LIST VIEW",
         ViewMode::Focus => "DOING FOCUS",
         ViewMode::Completed => "COMPLETED",
+        ViewMode::Multi => "MULTI VIEW",
     };
     let title = " FOCUS LIST ";
     let view = format!(" {view} ");
@@ -181,7 +222,9 @@ fn render_tabs(frame: &mut Frame, app: &App, area: Rect) {
     let mut spans = Vec::new();
     for (index, label) in tab_layout(app, area.width as usize) {
         let style = match index {
-            Some(index) if index == app.current => Style::new().fg(BG).bg(VIOLET).bold(),
+            Some(index) if index == app.current && app.view != ViewMode::Multi => {
+                Style::new().fg(BG).bg(VIOLET).bold()
+            }
             Some(_) => Style::new().fg(MUTED).bg(PANEL),
             None => Style::new().fg(MUTED),
         };
@@ -373,6 +416,77 @@ fn render_list(frame: &mut Frame, app: &App, area: Rect) {
     );
 }
 
+fn render_multi(frame: &mut Frame, app: &App, area: Rect) {
+    let outer = area.inner(Margin::new(1, 0));
+    let block = Block::new()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::new().fg(AMBER))
+        .style(Style::new().bg(PANEL));
+    let inner = block.inner(outer);
+    frame.render_widget(block, outer);
+
+    let mut lines = Vec::new();
+    for list in &app.lists {
+        let visible: Vec<_> = list
+            .tasks
+            .iter()
+            .filter(|task| matches!(task.status, Status::Doing | Status::Pending))
+            .collect();
+        if visible.is_empty() {
+            continue;
+        }
+        lines.push(Line::styled(
+            format!(" {} ", list.name.to_uppercase()),
+            Style::new().fg(AMBER).bold(),
+        ));
+        for status in [Status::Doing, Status::Pending] {
+            let tasks: Vec<_> = visible
+                .iter()
+                .copied()
+                .filter(|task| task.status == status)
+                .collect();
+            if tasks.is_empty() {
+                continue;
+            }
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!(
+                        "  {} {} ",
+                        status_icon(status),
+                        status.label().to_uppercase()
+                    ),
+                    Style::new().fg(status_color(status)).bold(),
+                ),
+                Span::styled(format!("({})", tasks.len()), Style::new().fg(MUTED)),
+            ]));
+            lines.extend(
+                tasks
+                    .into_iter()
+                    .flat_map(|task| task_lines(app, task, inner.width.saturating_sub(3) as usize)),
+            );
+        }
+        lines.push(Line::raw(""));
+    }
+    if lines.is_empty() {
+        lines.push(Line::styled(
+            "  · no Doing or Pending tasks ·",
+            Style::new().fg(MUTED).italic(),
+        ));
+    }
+    let selected_line = lines
+        .iter()
+        .position(|line| line.spans.iter().any(|span| span.style.bg == Some(VIOLET)))
+        .unwrap_or(0);
+    let scroll = selected_line.saturating_sub(inner.height.saturating_sub(1) as usize) as u16;
+    frame.render_widget(
+        Paragraph::new(lines)
+            .scroll((scroll, 0))
+            .style(Style::new().bg(PANEL)),
+        inner,
+    );
+}
+
 fn render_focus(frame: &mut Frame, app: &App, area: Rect) {
     let outer = area.inner(Margin::new(1, 0));
     let block = Block::new()
@@ -550,6 +664,8 @@ fn render_footer(frame: &mut Frame, app: &App, area: Rect) {
         Line::styled("", Style::default())
     };
     let keys = Line::from(vec![
+        Span::styled(" ctrl+a ", Style::new().fg(VIOLET).bold()),
+        Span::styled("multi  ", Style::new().fg(MUTED)),
         Span::styled(" tab ", Style::new().fg(VIOLET).bold()),
         Span::styled("lists  ", Style::new().fg(MUTED)),
         Span::styled(" ↑↓ ", Style::new().fg(VIOLET).bold()),
@@ -614,6 +730,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         help_line("Space then ↑/↓", "Move selected task within its status"),
         help_line("n / e / x", "New, edit, delete task"),
         help_line("Tab / Shift+Tab", "Switch task lists"),
+        help_line("Ctrl+a", "Toggle all-lists Multi view"),
         help_line("Ctrl+n", "Create a task list"),
         help_line("F2 / Ctrl+r", "Rename current task list"),
         help_line("Ctrl+x", "Delete current task list"),
@@ -1051,7 +1168,12 @@ mod tests {
         let mut doing = crate::model::Task::new("Visible task");
         doing.status = Status::Doing;
         app.current_list_mut().tasks.push(doing);
-        for view in [ViewMode::List, ViewMode::Focus, ViewMode::Completed] {
+        for view in [
+            ViewMode::List,
+            ViewMode::Focus,
+            ViewMode::Completed,
+            ViewMode::Multi,
+        ] {
             app.view = view;
             let backend = TestBackend::new(100, 28);
             let mut terminal = Terminal::new(backend).unwrap();
@@ -1119,6 +1241,47 @@ mod tests {
         assert_eq!(tab_at(&app, 40, 8, 0), None);
         app.overlay = Overlay::Help;
         assert_eq!(tab_at(&app, 40, 1, 1), None);
+    }
+
+    #[test]
+    fn multi_view_hit_testing_crosses_list_boundaries() {
+        let directory = tempdir().unwrap();
+        let mut app = App::load(directory.path().to_path_buf()).unwrap();
+        let first = crate::model::Task::new("First");
+        let first_id = first.id;
+        app.current_list_mut().tasks.push(first);
+        let mut second_list = crate::model::TaskList::named("Work");
+        let second = crate::model::Task::new("Second");
+        let second_id = second.id;
+        second_list.tasks.push(second);
+        app.lists.push(second_list);
+        app.view = ViewMode::Multi;
+        let area = Rect::new(0, 0, 80, 24);
+
+        assert_eq!(task_at(&app, area, 4, 5), Some(first_id));
+        assert_eq!(task_at(&app, area, 4, 9), Some(second_id));
+    }
+
+    #[test]
+    fn multi_view_tabs_have_no_selected_style() {
+        let directory = tempdir().unwrap();
+        let mut app = App::load(directory.path().to_path_buf()).unwrap();
+        app.lists.push(crate::model::TaskList::named("Work"));
+        app.view = ViewMode::Multi;
+        let backend = TestBackend::new(40, 1);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| render_tabs(frame, &app, frame.area()))
+            .unwrap();
+
+        assert!(
+            terminal
+                .backend()
+                .buffer()
+                .content
+                .iter()
+                .all(|cell| cell.bg != VIOLET)
+        );
     }
 
     #[test]
