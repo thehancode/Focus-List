@@ -23,7 +23,8 @@ const AMBER: Color = Color::Rgb(249, 191, 96);
 const CYAN: Color = Color::Rgb(93, 211, 220);
 const GREEN: Color = Color::Rgb(125, 207, 145);
 const RED: Color = Color::Rgb(244, 112, 122);
-const HEADER_HEIGHT: u16 = 1;
+// One content row followed by one blank row to separate the header from the list.
+const HEADER_HEIGHT: u16 = 2;
 
 pub fn render(frame: &mut Frame, app: &App) {
     let area = frame.area();
@@ -236,7 +237,6 @@ fn render_kanban(frame: &mut Frame, app: &App, area: Rect) {
 fn render_list(frame: &mut Frame, app: &App, area: Rect) {
     let outer = area.inner(Margin::new(1, 0));
     let block = Block::new()
-        .title(Line::styled(" FOCUS LIST ", Style::new().fg(VIOLET).bold()))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(VIOLET))
@@ -291,7 +291,6 @@ fn render_list(frame: &mut Frame, app: &App, area: Rect) {
 fn render_focus(frame: &mut Frame, app: &App, area: Rect) {
     let outer = area.inner(Margin::new(1, 0));
     let block = Block::new()
-        .title(Line::styled(" DOING FOCUS ", Style::new().fg(CYAN).bold()))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(CYAN))
@@ -321,7 +320,6 @@ fn render_focus(frame: &mut Frame, app: &App, area: Rect) {
 fn render_completed(frame: &mut Frame, app: &App, area: Rect) {
     let outer = area.inner(Margin::new(1, 0));
     let block = Block::new()
-        .title(Line::styled(" COMPLETED ", Style::new().fg(GREEN).bold()))
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::new().fg(GREEN))
@@ -894,14 +892,14 @@ mod tests {
         app.current_list_mut().tasks.push(task);
 
         let area = Rect::new(0, 0, 30, 20);
-        // The empty Doing section occupies rows 2..4, the Pending heading is
-        // row 5, and this task begins on row 6. Continuations are clickable.
-        assert_eq!(task_at(&app, area, 4, 6), Some(task_id));
+        // The empty Doing section occupies rows 3..5, the Pending heading is
+        // row 6, and this task begins on row 7. Continuations are clickable.
         assert_eq!(task_at(&app, area, 4, 7), Some(task_id));
-        assert_eq!(task_at(&app, area, 4, 5), None);
+        assert_eq!(task_at(&app, area, 4, 8), Some(task_id));
+        assert_eq!(task_at(&app, area, 4, 6), None);
 
         app.overlay = Overlay::Help;
-        assert_eq!(task_at(&app, area, 4, 6), None);
+        assert_eq!(task_at(&app, area, 4, 7), None);
     }
 
     #[test]

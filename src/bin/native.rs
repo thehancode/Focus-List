@@ -350,7 +350,16 @@ fn resize_cursor(direction: ResizeDirection) -> egui::CursorIcon {
 }
 
 fn install_fonts(ctx: &egui::Context) {
+    ctx.set_fonts(font_definitions());
+}
+
+fn font_definitions() -> FontDefinitions {
     let mut fonts = FontDefinitions::default();
+    let fallback_fonts = fonts
+        .families
+        .get(&FontFamily::Monospace)
+        .cloned()
+        .unwrap_or_default();
     fonts.font_data.insert(
         REGULAR_FONT.into(),
         Arc::new(FontData::from_static(include_bytes!(
@@ -370,12 +379,17 @@ fn install_fonts(ctx: &egui::Context) {
         .insert(0, REGULAR_FONT.into());
     fonts.families.insert(
         FontFamily::Name(REGULAR_FONT.into()),
-        vec![REGULAR_FONT.into()],
+        std::iter::once(REGULAR_FONT.into())
+            .chain(fallback_fonts.iter().cloned())
+            .collect(),
+    );
+    fonts.families.insert(
+        FontFamily::Name(BOLD_FONT.into()),
+        std::iter::once(BOLD_FONT.into())
+            .chain(fallback_fonts)
+            .collect(),
     );
     fonts
-        .families
-        .insert(FontFamily::Name(BOLD_FONT.into()), vec![BOLD_FONT.into()]);
-    ctx.set_fonts(fonts);
 }
 
 fn cell_metrics(ctx: &egui::Context, font_size: f32) -> CellMetrics {
@@ -577,6 +591,21 @@ mod tests {
             Some(GridHit::Resize(ResizeDirection::SouthEast))
         );
         assert_eq!(chrome_hit((40, 12), size), None);
+    }
+
+    #[test]
+    fn custom_fonts_keep_bundled_symbol_fallbacks() {
+        let fonts = font_definitions();
+        for primary in [REGULAR_FONT, BOLD_FONT] {
+            let family = fonts
+                .families
+                .get(&FontFamily::Name(primary.into()))
+                .unwrap();
+            assert_eq!(family.first().map(String::as_str), Some(primary));
+            assert!(family.iter().any(|font| font == "Ubuntu-Light"));
+            assert!(family.iter().any(|font| font == "NotoEmoji-Regular"));
+            assert!(family.iter().any(|font| font == "Hack"));
+        }
     }
 
     #[test]
