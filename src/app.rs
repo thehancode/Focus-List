@@ -10,7 +10,8 @@ use uuid::Uuid;
 
 use crate::{
     model::{
-        AppConfig, Status, Task, TaskList, MAX_MARQUEE_SPEED_MS, MIN_MARQUEE_SPEED_MS,
+        AppConfig, Status, Task, TaskList, MAX_MARQUEE_SPEED_MS, MAX_NATIVE_FONT_SIZE,
+        MIN_MARQUEE_SPEED_MS, MIN_NATIVE_FONT_SIZE,
     },
     storage::{ConfigStore, TaskStore},
 };
@@ -70,6 +71,7 @@ pub struct App {
     pub view: ViewMode,
     pub overlay: Overlay,
     pub bell_enabled: bool,
+    terminal_bell_enabled: bool,
     pub chord_started: Option<Instant>,
     pub animation: Option<Animation>,
     pub notice: Option<Notice>,
@@ -108,6 +110,7 @@ impl App {
             view: ViewMode::List,
             overlay: Overlay::None,
             bell_enabled: true,
+            terminal_bell_enabled: true,
             chord_started: None,
             animation: None,
             notice,
@@ -116,6 +119,13 @@ impl App {
         };
         app.select_first();
         Ok(app)
+    }
+
+    /// Prevents the terminal-only ASCII bell from being written by a non-TUI
+    /// frontend. The user-facing sound preference remains intact for a future
+    /// native audio implementation.
+    pub fn disable_terminal_bell(&mut self) {
+        self.terminal_bell_enabled = false;
     }
 
     pub fn current_list(&self) -> &TaskList {
@@ -431,16 +441,18 @@ impl App {
                 selected: selected.saturating_sub(1),
             },
             KeyCode::Down | KeyCode::Char('j') => self.overlay = Overlay::Settings {
-                selected: (selected + 1).min(1),
+                selected: (selected + 1).min(2),
             },
             KeyCode::Left | KeyCode::Char('h') => match selected {
                 0 => self.adjust_marquee_speed(-25),
                 1 => self.toggle_long_title_display(),
+                2 => self.adjust_native_font_size(-1),
                 _ => {}
             },
             KeyCode::Right | KeyCode::Char('l') => match selected {
                 0 => self.adjust_marquee_speed(25),
                 1 => self.toggle_long_title_display(),
+                2 => self.adjust_native_font_size(1),
                 _ => {}
             },
             _ => {}
@@ -468,6 +480,20 @@ impl App {
                 format!("Long titles: {}", self.config.long_title_display.label()),
                 false,
             ),
+            Err(error) => self.set_notice(format!("Settings save failed: {error:#}"), true),
+        }
+    }
+
+    fn adjust_native_font_size(&mut self, delta: i16) {
+        let size = (self.config.native_font_size as i16 + delta)
+            .clamp(MIN_NATIVE_FONT_SIZE as i16, MAX_NATIVE_FONT_SIZE as i16)
+            as u16;
+        if size == self.config.native_font_size {
+            return;
+        }
+        self.config.native_font_size = size;
+        match self.config_store.save(&self.config) {
+            Ok(()) => self.set_notice(format!("Native font: {size} pt"), false),
             Err(error) => self.set_notice(format!("Settings save failed: {error:#}"), true),
         }
     }
@@ -511,7 +537,7 @@ impl App {
             started: now,
         });
         self.save_current(&format!("{} → {}", from.label(), to.label()));
-        if self.bell_enabled {
+        if self.bell_enabled && self.terminal_bell_enabled {
             let _ = emit_bell(&mut io::stdout());
         }
     }
@@ -537,7 +563,7 @@ impl App {
             started: now,
         });
         self.save_current("Done → Doing");
-        if self.bell_enabled {
+        if self.bell_enabled && self.terminal_bell_enabled {
             let _ = emit_bell(&mut io::stdout());
         }
     }
@@ -1027,6 +1053,32 @@ mod tests {
         );
         assert_eq!(app.config.long_title_display.label(), "Wrap");
         assert_eq!(app.config_store.load().unwrap().long_title_display.label(), "Wrap");
+    }
+
+    #[test]
+    fn settings_menu_updates_and_persists_native_font_size() {
+        let mut app = app();
+        let now = Instant::now();
+        let initial_size = app.config.native_font_size;
+        app.handle_key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE), now);
+        app.handle_key(
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+            now + Duration::from_millis(1),
+        );
+        app.handle_key(
+            KeyEvent::new(KeyCode::Down, KeyModifiers::NONE),
+            now + Duration::from_millis(2),
+        );
+        assert_eq!(app.overlay, Overlay::Settings { selected: 2 });
+        app.handle_key(
+            KeyEvent::new(KeyCode::Right, KeyModifiers::NONE),
+            now + Duration::from_millis(3),
+        );
+        assert_eq!(app.config.native_font_size, initial_size + 1);
+        assert_eq!(
+            app.config_store.load().unwrap().native_font_size,
+            initial_size + 1
+        );
     }
 
     #[test]

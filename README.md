@@ -8,6 +8,21 @@ A small, colorful terminal task list with a main list, Doing focus, and complete
 cargo run --release
 ```
 
+## Native preview
+
+The native preview opens the same keyboard-first interface in its own window,
+without requiring Ghostty or another terminal emulator:
+
+```sh
+cargo run --release --bin tui-kanban-native
+```
+
+It currently shares the terminal version's data directory and JSON file, so do
+not run both editions at the same time. The preview preserves the Ratatui grid
+renderer while the remaining cross-platform input, sound, and packaging work is
+completed. It bundles UbuntuMono Nerd Font Mono for consistent, crisp rendering;
+its Ubuntu Font Licence is included at `assets/licenses/`.
+
 The app saves everything immediately in one human-readable JSON file:
 `~/.local/share/tui-kanban/tasklists/tasklist.json` (or
 `$XDG_DATA_HOME/tui-kanban/tasklists/tasklist.json` when `XDG_DATA_HOME` is set).
@@ -16,7 +31,8 @@ Settings are stored beside it in `config/settings.json`; the default is:
 ```json
 {
   "marquee_speed_ms": 180,
-  "long_title_display": "marquee"
+  "long_title_display": "marquee",
+  "native_font_size": 16
 }
 ```
 
@@ -33,7 +49,7 @@ Settings are stored beside it in `config/settings.json`; the default is:
 | `c` | Toggle Doing-only focus mode |
 | `v` | Open or close completed history |
 | `s` | Toggle the terminal bell |
-| `g` | Open settings (adjust marquee speed and title display) |
+| `g` | Open settings (adjust marquee speed, title display, and native font size) |
 | `?` | Show all shortcuts |
 | `q`, `Ctrl+C` | Quit |
 

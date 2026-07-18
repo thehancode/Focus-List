@@ -506,7 +506,7 @@ fn render_prompt(
 }
 
 fn render_settings(frame: &mut Frame, app: &App, selected: usize, area: Rect) {
-    let popup = centered(area, 56, 32, 44, 8);
+    let popup = centered(area, 56, 38, 44, 10);
     frame.render_widget(Clear, popup);
     let block = modal_block(" SETTINGS ");
     let inner = block.inner(popup);
@@ -515,6 +515,7 @@ fn render_settings(frame: &mut Frame, app: &App, selected: usize, area: Rect) {
     let normal_style = Style::new().fg(TEXT);
     let speed_style = if selected == 0 { selected_style } else { normal_style };
     let display_style = if selected == 1 { selected_style } else { normal_style };
+    let font_size_style = if selected == 2 { selected_style } else { normal_style };
     let text = Text::from(vec![
         Line::styled(" Use ←/→ or h/l to adjust values", Style::new().fg(MUTED)),
         Line::raw(""),
@@ -529,8 +530,12 @@ fn render_settings(frame: &mut Frame, app: &App, selected: usize, area: Rect) {
             Span::styled(" Long titles  ", display_style),
             Span::styled(app.config.long_title_display.label(), display_style),
         ]),
+        Line::from(vec![
+            Span::styled(" Native font  ", font_size_style),
+            Span::styled(format!("{} pt", app.config.native_font_size), font_size_style),
+        ]),
         Line::raw(""),
-        Line::styled(" Lower speed is faster. Long titles can scroll or wrap.", Style::new().fg(MUTED)),
+        Line::styled(" Lower speed is faster. Font size affects the native app.", Style::new().fg(MUTED)),
         Line::styled(" Esc or g close", Style::new().fg(MUTED)),
     ]);
     frame.render_widget(Paragraph::new(text).style(Style::new().bg(PANEL)), inner);

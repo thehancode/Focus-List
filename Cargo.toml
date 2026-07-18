@@ -8,11 +8,15 @@ license = "MIT"
 [dependencies]
 anyhow = "1.0"
 chrono = { version = "0.4", features = ["serde"] }
+eframe = "0.35"
 ratatui = "0.30"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
+[[bin]]
+name = "tui-kanban-native"
+path = "src/bin/native.rs"
+
 [dev-dependencies]
 tempfile = "3.0"
-

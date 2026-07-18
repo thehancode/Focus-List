@@ -6,6 +6,9 @@ pub const SCHEMA_VERSION: u8 = 1;
 pub const DEFAULT_MARQUEE_SPEED_MS: u64 = 180;
 pub const MIN_MARQUEE_SPEED_MS: u64 = 50;
 pub const MAX_MARQUEE_SPEED_MS: u64 = 1_000;
+pub const DEFAULT_NATIVE_FONT_SIZE: u16 = 16;
+pub const MIN_NATIVE_FONT_SIZE: u16 = 10;
+pub const MAX_NATIVE_FONT_SIZE: u16 = 28;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -37,6 +40,8 @@ pub struct AppConfig {
     pub marquee_speed_ms: u64,
     /// How long task titles are displayed when they exceed the available width.
     pub long_title_display: LongTitleDisplay,
+    /// Point size used by the standalone native window renderer.
+    pub native_font_size: u16,
 }
 
 impl Default for AppConfig {
@@ -44,6 +49,7 @@ impl Default for AppConfig {
         Self {
             marquee_speed_ms: DEFAULT_MARQUEE_SPEED_MS,
             long_title_display: LongTitleDisplay::Marquee,
+            native_font_size: DEFAULT_NATIVE_FONT_SIZE,
         }
     }
 }
@@ -53,6 +59,10 @@ impl AppConfig {
         anyhow::ensure!(
             (MIN_MARQUEE_SPEED_MS..=MAX_MARQUEE_SPEED_MS).contains(&self.marquee_speed_ms),
             "marquee_speed_ms must be between {MIN_MARQUEE_SPEED_MS} and {MAX_MARQUEE_SPEED_MS}"
+        );
+        anyhow::ensure!(
+            (MIN_NATIVE_FONT_SIZE..=MAX_NATIVE_FONT_SIZE).contains(&self.native_font_size),
+            "native_font_size must be between {MIN_NATIVE_FONT_SIZE} and {MAX_NATIVE_FONT_SIZE}"
         );
         Ok(())
     }
@@ -179,5 +189,14 @@ mod tests {
     #[test]
     fn default_config_has_a_valid_marquee_speed() {
         AppConfig::default().validate().unwrap();
+    }
+
+    #[test]
+    fn native_font_size_must_be_in_range() {
+        let mut config = AppConfig::default();
+        config.native_font_size = MIN_NATIVE_FONT_SIZE - 1;
+        assert!(config.validate().is_err());
+        config.native_font_size = MAX_NATIVE_FONT_SIZE + 1;
+        assert!(config.validate().is_err());
     }
 }
