@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=TUI Kanban
+GenericName=Task List
+Comment=Open the native Kanban task list
+Exec=@HOME@/.local/bin/tui-kanban-native
+Icon=tui-kanban
+Terminal=false
+Categories=Office;
+StartupNotify=true
+StartupWMClass=kanban
+Keywords=kanban;tasks;todo;

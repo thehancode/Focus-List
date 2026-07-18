@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+runtime_dir="${XDG_RUNTIME_DIR:-/tmp}"
+lock_file="$runtime_dir/tui-kanban-native-${UID}.lock"
+binary="$data_home/tui-kanban/bin/tui-kanban-native"
+
+# Keep the lock for the lifetime of the app. A second menu click exits quietly.
+exec /usr/bin/flock --nonblock "$lock_file" "$binary" "$@"

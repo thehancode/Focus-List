@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TUI Kanban
+Comment=Open the native Kanban task list at login
+Exec=@HOME@/.local/bin/tui-kanban-native
+Icon=tui-kanban
+Terminal=false
+StartupNotify=false
+X-GNOME-Autostart-enabled=true
+OnlyShowIn=GNOME;Unity;
