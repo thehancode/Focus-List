@@ -12,7 +12,8 @@ class TaskCount extends Notifier<int> {
   void increment() => state++;
 }
 
-bool get isDesktop => switch (defaultTargetPlatform) {
+bool get isDesktop => !kIsWeb &&
+    switch (defaultTargetPlatform) {
       TargetPlatform.linux || TargetPlatform.macOS || TargetPlatform.windows =>
         true,
       _ => false,
