@@ -7,17 +7,43 @@ pub const DEFAULT_MARQUEE_SPEED_MS: u64 = 180;
 pub const MIN_MARQUEE_SPEED_MS: u64 = 50;
 pub const MAX_MARQUEE_SPEED_MS: u64 = 1_000;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LongTitleDisplay {
+    Marquee,
+    Wrap,
+}
+
+impl LongTitleDisplay {
+    pub fn toggle(self) -> Self {
+        match self {
+            Self::Marquee => Self::Wrap,
+            Self::Wrap => Self::Marquee,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Marquee => "Marquee",
+            Self::Wrap => "Wrap",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct AppConfig {
     /// Milliseconds between each marquee character shift. Lower is faster.
     pub marquee_speed_ms: u64,
+    /// How long task titles are displayed when they exceed the available width.
+    pub long_title_display: LongTitleDisplay,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             marquee_speed_ms: DEFAULT_MARQUEE_SPEED_MS,
+            long_title_display: LongTitleDisplay::Marquee,
         }
     }
 }
@@ -71,6 +97,12 @@ pub struct Task {
     /// Set only while a task is in Done, so completion history can be ordered accurately.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completed_at: Option<DateTime<Utc>>,
+    /// Daily tasks return to Pending on a new local calendar day.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub daily: bool,
+    /// Every completion of a daily task, retained for history and activity views.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub completion_history: Vec<DateTime<Utc>>,
 }
 
 impl Task {
@@ -83,6 +115,8 @@ impl Task {
             created_at: now,
             updated_at: now,
             completed_at: None,
+            daily: false,
+            completion_history: Vec::new(),
         }
     }
 }
