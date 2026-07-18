@@ -43,6 +43,7 @@ fn main() -> Result<()> {
                 STARTUP_ROWS * startup_cell_height,
             ])
             .with_min_inner_size([STARTUP_COLUMNS * startup_cell_width, 255.0])
+            .with_decorations(false)
             .with_resizable(true),
         // A previous manual resize would otherwise override the requested
         // startup grid on the next launch.
