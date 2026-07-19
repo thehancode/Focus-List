@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import '../app/ui_mode.dart';
 import '../domain/models.dart';
+import '../l10n/app_localizations.dart';
 import 'terminal_style.dart';
 import 'workspace_view_model.dart';
 
@@ -190,16 +191,17 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     bool duplicate = false,
   }) async {
     final state = ref.read(workspaceViewModelProvider);
+    final strings = AppLocalizations.of(context)!;
     final selected = state.selectedTask;
     if ((edit || duplicate) && selected == null) return;
     final result = await showDialog<_TaskDraft>(
       context: context,
       builder: (_) => _TaskEditorDialog(
         title: edit
-            ? 'Edit task'
+            ? strings.editTask
             : duplicate
-            ? 'Duplicate task'
-            : 'New task',
+            ? strings.duplicateTask
+            : strings.newTask,
         initialTitle: selected?.title ?? '',
         initialDaily: selected?.daily ?? false,
       ),
@@ -237,7 +239,11 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
 
   Future<void> _confirmDeleteTask() async {
     if (ref.read(workspaceViewModelProvider).selectedTask == null) return;
-    final confirmed = await _confirm('Delete task?', 'This cannot be undone.');
+    final strings = AppLocalizations.of(context)!;
+    final confirmed = await _confirm(
+      strings.deleteTaskTitle,
+      strings.deleteTaskBody,
+    );
     if (confirmed) {
       await ref.read(workspaceViewModelProvider.notifier).deleteSelectedTask();
     }
@@ -251,8 +257,10 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       return;
     }
     final confirmed = await _confirm(
-      'Delete list?',
-      'Delete "${state.currentList?.name}" and all its tasks?',
+      AppLocalizations.of(context)!.deleteListTitle,
+      AppLocalizations.of(
+        context,
+      )!.deleteListBody(state.currentList?.name ?? ''),
     );
     if (confirmed) {
       await ref.read(workspaceViewModelProvider.notifier).deleteCurrentList();
@@ -271,12 +279,12 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Cancel'),
+              child: Text(AppLocalizations.of(context)!.cancel),
             ),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: _red),
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete'),
+              child: Text(AppLocalizations.of(context)!.delete),
             ),
           ],
         ),
@@ -296,26 +304,14 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     builder: (_) => AlertDialog(
       titlePadding: _dialogTitlePadding,
       contentPadding: _dialogContentPadding,
-      title: const Text('Keyboard shortcuts'),
-      content: const SingleChildScrollView(
-        child: Text(
-          '↑/↓ or J/K   Move selection\n'
-          'Space then F   Advance status\n'
-          'Space then ↑/↓   Reorder in status\n'
-          'N / E / D / X   New, edit, duplicate, delete task\n'
-          'T / Shift+T   Cycle first / second tag\n'
-          'Tab / Shift+Tab   Switch task lists\n'
-          'Ctrl+A   Multi view\n'
-          'Ctrl+N   New list\n'
-          'F2 / Ctrl+R   Rename list\n'
-          'Ctrl+X   Delete list\n'
-          'C   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit',
-        ),
+      title: Text(AppLocalizations.of(context)!.keyboardShortcuts),
+      content: SingleChildScrollView(
+        child: Text(AppLocalizations.of(context)!.keyboardShortcutsHelp),
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(AppLocalizations.of(context)!.close),
         ),
       ],
     ),
@@ -330,7 +326,11 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     }
     if (state.phase == WorkspacePhase.failure) {
       return Scaffold(
-        body: Center(child: Text(state.error ?? 'Could not load Focus List')),
+        body: Center(
+          child: Text(
+            state.error ?? AppLocalizations.of(context)!.couldNotLoad,
+          ),
+        ),
       );
     }
     final workspace = SafeArea(
@@ -384,7 +384,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
             ? FloatingActionButton.extended(
                 onPressed: _showTaskEditor,
                 icon: const Icon(Icons.add),
-                label: const Text('Task'),
+                label: Text(AppLocalizations.of(context)!.task),
               )
             : null,
         body: workspace,
@@ -400,7 +400,7 @@ class _DesktopWindowDragArea extends StatelessWidget {
   Widget build(BuildContext context) => KeyedSubtree(
     key: const Key('desktop-window-drag-area'),
     child: Semantics(
-      label: 'Drag window',
+      label: AppLocalizations.of(context)!.dragWindow,
       child: MouseRegion(
         cursor: SystemMouseCursors.move,
         child: DragToMoveArea(
@@ -435,6 +435,7 @@ class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final terminal = usesTerminalPresentation;
+    final strings = AppLocalizations.of(context)!;
     return SizedBox(
       child: Row(
         children: [
@@ -446,7 +447,7 @@ class _Header extends ConsumerWidget {
             ),
             alignment: Alignment.center,
             child: Text(
-              'FOCUS LIST',
+              strings.workspaceTitle,
               style: TextStyle(
                 color: terminal ? terminalBackground : _violet,
                 fontWeight: FontWeight.bold,
@@ -456,34 +457,34 @@ class _Header extends ConsumerWidget {
           ),
           const Spacer(),
           Text(
-            _viewLabel(state.view),
+            _viewLabel(state.view, strings),
             style: const TextStyle(color: _muted, fontWeight: FontWeight.bold),
           ),
           if (!terminal) ...[
             const SizedBox(width: 8),
             IconButton(
-              tooltip: 'New task (N)',
+              tooltip: strings.newTaskTooltip,
               onPressed: onNewTask,
               icon: const Icon(Icons.add_task),
             ),
             IconButton(
-              tooltip: 'New list (Ctrl+N)',
+              tooltip: strings.newListTooltip,
               onPressed: onCreateList,
               icon: const Icon(Icons.playlist_add),
             ),
             PopupMenuButton<String>(
-              tooltip: 'List actions',
+              tooltip: strings.listActions,
               onSelected: (value) {
                 if (value == 'rename') onRenameList();
                 if (value == 'delete') onDeleteList();
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'rename', child: Text('Rename list')),
-                PopupMenuItem(value: 'delete', child: Text('Delete list')),
+              itemBuilder: (_) => [
+                PopupMenuItem(value: 'rename', child: Text(strings.renameList)),
+                PopupMenuItem(value: 'delete', child: Text(strings.deleteList)),
               ],
             ),
             PopupMenuButton<String>(
-              tooltip: 'App actions',
+              tooltip: strings.appActions,
               onSelected: (value) {
                 if (value == 'multi') {
                   ref
@@ -493,10 +494,16 @@ class _Header extends ConsumerWidget {
                 if (value == 'settings') onSettings();
                 if (value == 'help') onHelp();
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'multi', child: Text('Toggle Multi view')),
-                PopupMenuItem(value: 'settings', child: Text('Settings')),
-                PopupMenuItem(value: 'help', child: Text('Keyboard shortcuts')),
+              itemBuilder: (_) => [
+                PopupMenuItem(
+                  value: 'multi',
+                  child: Text(strings.toggleMultiView),
+                ),
+                PopupMenuItem(value: 'settings', child: Text(strings.settings)),
+                PopupMenuItem(
+                  value: 'help',
+                  child: Text(strings.keyboardShortcuts),
+                ),
               ],
             ),
           ],
@@ -512,6 +519,7 @@ class _Tabs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final strings = AppLocalizations.of(context)!;
     Widget item(int index) {
       final list = state.lists[index];
       final selected =
@@ -519,7 +527,7 @@ class _Tabs extends ConsumerWidget {
       return Semantics(
         selected: selected,
         button: true,
-        label: 'Task list ${list.name}',
+        label: strings.taskList(list.name),
         child: usesTerminalPresentation
             ? InkWell(
                 onTap: () => ref
@@ -632,7 +640,7 @@ class _ListContent extends StatelessWidget {
       ])
         _TaskSection(
           state: state,
-          title: status.label,
+          title: _statusLabel(status, AppLocalizations.of(context)!),
           status: status,
           tasks:
               state.currentList?.tasks
@@ -660,7 +668,8 @@ class _FocusContent extends StatelessWidget {
           ? TerminalMetrics.panelPadding(context)
           : const EdgeInsets.all(12),
       children: [
-        if (tasks.isEmpty) const _EmptyState('No doing tasks'),
+        if (tasks.isEmpty)
+          _EmptyState(AppLocalizations.of(context)!.noDoingTasks),
         for (final task in tasks) _TaskRow(task: task, state: state),
       ],
     );
@@ -675,9 +684,7 @@ class _CompletedContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final entries = state.completedEntries;
     if (entries.isEmpty) {
-      return const _EmptyState(
-        'No completed tasks yet — finish one with Space, then F.',
-      );
+      return _EmptyState(AppLocalizations.of(context)!.noCompletedTasks);
     }
     return ListView.builder(
       padding: usesTerminalPresentation
@@ -726,7 +733,7 @@ class _MultiContent extends StatelessWidget {
           children.add(
             _TaskSection(
               state: state,
-              title: status.label,
+              title: _statusLabel(status, AppLocalizations.of(context)!),
               status: status,
               tasks: tasks,
             ),
@@ -735,7 +742,7 @@ class _MultiContent extends StatelessWidget {
       }
     }
     return children.isEmpty
-        ? const _EmptyState('No Doing or Pending tasks')
+        ? _EmptyState(AppLocalizations.of(context)!.noDoingOrPendingTasks)
         : ListView(
             padding: usesTerminalPresentation
                 ? TerminalMetrics.panelPadding(context)
@@ -780,7 +787,10 @@ class _TaskSection extends StatelessWidget {
                     ? TerminalMetrics.line(context)
                     : 0,
               ),
-              child: Text('· empty', style: TextStyle(color: _muted)),
+              child: Text(
+                '· ${AppLocalizations.of(context)!.empty}',
+                style: const TextStyle(color: _muted),
+              ),
             )
           else
             for (final task in tasks) _TaskRow(task: task, state: state),
@@ -820,9 +830,15 @@ class _TaskRow extends ConsumerWidget {
     final row = Semantics(
       selected: selected,
       button: true,
-      label:
-          '${task.status.label} task: ${task.title}'
-          '${task.tags.isEmpty ? '' : ', tags: ${task.tags.map(state.settings.tagNames.nameFor).join(', ')}'}',
+      label: AppLocalizations.of(context)!.taskSemantics(
+        _statusLabel(task.status, AppLocalizations.of(context)!),
+        task.title,
+        task.tags.isEmpty
+            ? ''
+            : AppLocalizations.of(context)!.taskTagsSemantics(
+                task.tags.map(state.settings.tagNames.nameFor).join(', '),
+              ),
+      ),
       child: InkWell(
         onTap: () =>
             ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
@@ -887,7 +903,7 @@ class _TaskRow extends ConsumerWidget {
                 ),
               if (completedAt == null && !terminal)
                 IconButton(
-                  tooltip: 'Advance task',
+                  tooltip: AppLocalizations.of(context)!.advanceTask,
                   color: selected
                       ? const Color(0xff0d0f18)
                       : _statusColor(task.status),
@@ -905,7 +921,7 @@ class _TaskRow extends ConsumerWidget {
                 ),
               if (!terminal)
                 PopupMenuButton<String>(
-                  tooltip: 'Task actions',
+                  tooltip: AppLocalizations.of(context)!.taskActions,
                   icon: Icon(
                     Icons.more_vert,
                     color: selected ? const Color(0xff0d0f18) : _muted,
@@ -914,16 +930,24 @@ class _TaskRow extends ConsumerWidget {
                       _handleTaskAction(context, ref, task, action),
                   itemBuilder: (_) => [
                     if (task.status == TaskStatus.done)
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'revert',
-                        child: Text('Reopen in Doing'),
+                        child: Text(
+                          AppLocalizations.of(context)!.reopenInDoing,
+                        ),
                       ),
-                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                    const PopupMenuItem(
-                      value: 'duplicate',
-                      child: Text('Duplicate'),
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Text(AppLocalizations.of(context)!.edit),
                     ),
-                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                    PopupMenuItem(
+                      value: 'duplicate',
+                      child: Text(AppLocalizations.of(context)!.duplicate),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Text(AppLocalizations.of(context)!.delete),
+                    ),
                   ],
                 ),
             ],
@@ -1156,13 +1180,15 @@ class _Footer extends ConsumerWidget {
             ),
           )
         : grabbed
-        ? const Text(
-            ' SPACE armed — F advance, ↑↓ reorder ',
+        ? Text(
+            AppLocalizations.of(context)!.spaceArmed,
             style: TextStyle(color: _amber, fontWeight: FontWeight.bold),
           )
         : state.selectedTask?.daily ?? false
         ? Text(
-            ' Daily: ${_dailyActivity(state.selectedTask!)}',
+            AppLocalizations.of(
+              context,
+            )!.dailyActivity(_dailyActivity(state.selectedTask!)),
             style: const TextStyle(color: _green, fontWeight: FontWeight.bold),
           )
         : terminal
@@ -1175,8 +1201,8 @@ class _Footer extends ConsumerWidget {
         children: [
           activity,
           const SizedBox(height: 3),
-          const Text(
-            'Ctrl+A multi   Tab lists   ↑↓ move   N new   Space+F advance   Space+↑↓ sort   ? help',
+          Text(
+            AppLocalizations.of(context)!.keyboardHint,
             style: TextStyle(color: _muted, fontSize: 12),
           ),
         ],
@@ -1197,39 +1223,63 @@ class _Footer extends ConsumerWidget {
             children: [
               _TerminalCommand(
                 keys: 'ctrl+a',
-                label: 'multi',
+                label: AppLocalizations.of(context)!.commandMulti,
                 onTap: ref
                     .read(workspaceViewModelProvider.notifier)
                     .toggleMultiView,
               ),
               _TerminalCommand(
                 keys: 'tab',
-                label: 'lists',
+                label: AppLocalizations.of(context)!.commandLists,
                 onTap: () =>
                     ref.read(workspaceViewModelProvider.notifier).cycleList(1),
               ),
-              const _TerminalCommand(keys: '↑↓', label: 'move'),
-              _TerminalCommand(keys: 'n', label: 'new', onTap: onNewTask),
-              const _TerminalCommand(keys: 'space f', label: 'advance'),
-              const _TerminalCommand(keys: 'space ↑↓', label: 'sort'),
-              const _TerminalCommand(keys: 't/shift+t', label: 'tags'),
+              _TerminalCommand(
+                keys: '↑↓',
+                label: AppLocalizations.of(context)!.commandMove,
+              ),
+              _TerminalCommand(
+                keys: 'n',
+                label: AppLocalizations.of(context)!.commandNew,
+                onTap: onNewTask,
+              ),
+              _TerminalCommand(
+                keys: 'space f',
+                label: AppLocalizations.of(context)!.commandAdvance,
+              ),
+              _TerminalCommand(
+                keys: 'space ↑↓',
+                label: AppLocalizations.of(context)!.commandSort,
+              ),
+              _TerminalCommand(
+                keys: 't/shift+t',
+                label: AppLocalizations.of(context)!.commandTags,
+              ),
               _TerminalCommand(
                 keys: 'ctrl+n',
-                label: 'new list',
+                label: AppLocalizations.of(context)!.commandNewList,
                 onTap: onCreateList,
               ),
               _TerminalCommand(
                 keys: 'f2',
-                label: 'rename',
+                label: AppLocalizations.of(context)!.commandRename,
                 onTap: onRenameList,
               ),
               _TerminalCommand(
                 keys: 'ctrl+x',
-                label: 'del list',
+                label: AppLocalizations.of(context)!.commandDeleteList,
                 onTap: onDeleteList,
               ),
-              _TerminalCommand(keys: 'g', label: 'settings', onTap: onSettings),
-              _TerminalCommand(keys: '?', label: 'help', onTap: onHelp),
+              _TerminalCommand(
+                keys: 'g',
+                label: AppLocalizations.of(context)!.commandSettings,
+                onTap: onSettings,
+              ),
+              _TerminalCommand(
+                keys: '?',
+                label: AppLocalizations.of(context)!.commandHelp,
+                onTap: onHelp,
+              ),
             ],
           ),
         ),
@@ -1247,7 +1297,7 @@ class _TerminalCommand extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Semantics(
     button: onTap != null,
-    label: '$label command ($keys)',
+    label: AppLocalizations.of(context)!.commandSemantics(label, keys),
     child: InkWell(
       onTap: onTap,
       child: Padding(
@@ -1351,19 +1401,21 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                 cursorWidth: usesTerminalPresentation ? 1 : 2,
                 maxLines: 3,
                 minLines: 1,
-                decoration: const InputDecoration(labelText: 'Task title'),
+                decoration: InputDecoration(
+                  labelText: AppLocalizations.of(context)!.taskTitle,
+                ),
               ),
               if (usesTerminalPresentation)
                 _TerminalToggle(
                   value: _daily,
-                  label: 'Daily task',
+                  label: AppLocalizations.of(context)!.dailyTask,
                   onChanged: (value) => setState(() => _daily = value),
                 )
               else
                 SwitchListTile(
                   value: _daily,
                   onChanged: (value) => setState(() => _daily = value),
-                  title: const Text('Daily task'),
+                  title: Text(AppLocalizations.of(context)!.dailyTask),
                 ),
             ],
           ),
@@ -1371,9 +1423,12 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
-          FilledButton(onPressed: _save, child: const Text('Save')),
+          FilledButton(
+            onPressed: _save,
+            child: Text(AppLocalizations.of(context)!.save),
+          ),
         ],
       ),
     ),
@@ -1404,7 +1459,11 @@ class _ListEditorDialogState extends State<_ListEditorDialog> {
   Widget build(BuildContext context) => AlertDialog(
     titlePadding: _dialogTitlePadding,
     contentPadding: _dialogContentPadding,
-    title: Text(widget.rename ? 'Rename list' : 'New list'),
+    title: Text(
+      widget.rename
+          ? AppLocalizations.of(context)!.renameList
+          : AppLocalizations.of(context)!.newList,
+    ),
     content: SizedBox(
       width: 380,
       child: TextField(
@@ -1416,15 +1475,20 @@ class _ListEditorDialogState extends State<_ListEditorDialog> {
             : null,
         cursorWidth: usesTerminalPresentation ? 1 : 2,
         onSubmitted: (_) => _save(),
-        decoration: const InputDecoration(labelText: 'List name'),
+        decoration: InputDecoration(
+          labelText: AppLocalizations.of(context)!.listName,
+        ),
       ),
     ),
     actions: [
       TextButton(
         onPressed: () => Navigator.pop(context),
-        child: const Text('Cancel'),
+        child: Text(AppLocalizations.of(context)!.cancel),
       ),
-      FilledButton(onPressed: _save, child: const Text('Save')),
+      FilledButton(
+        onPressed: _save,
+        child: Text(AppLocalizations.of(context)!.save),
+      ),
     ],
   );
 }
@@ -1464,7 +1528,9 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
         entry.key: normalizeName(entry.value.text),
     };
     if (values.values.any((value) => value.isEmpty)) {
-      setState(() => _tagError = 'Tag names cannot be empty');
+      setState(
+        () => _tagError = AppLocalizations.of(context)!.tagNamesCannotBeEmpty,
+      );
       return;
     }
     setState(() => _tagError = null);
@@ -1489,14 +1555,18 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
     return AlertDialog(
       titlePadding: _dialogTitlePadding,
       contentPadding: _dialogContentPadding,
-      title: const Text('Settings'),
+      title: Text(AppLocalizations.of(context)!.settings),
       content: SizedBox(
         width: 420,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Marquee speed: ${settings.marqueeSpeedMs} ms'),
+              Text(
+                AppLocalizations.of(
+                  context,
+                )!.marqueeSpeed(settings.marqueeSpeedMs),
+              ),
               Slider(
                 value: settings.marqueeSpeedMs.toDouble(),
                 min: minMarqueeSpeedMs.toDouble(),
@@ -1514,7 +1584,7 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                       longTitleDisplay: settings.longTitleDisplay.toggled,
                     ),
                   ),
-                  label: 'Wrap long titles',
+                  label: AppLocalizations.of(context)!.wrapLongTitles,
                 )
               else
                 SwitchListTile(
@@ -1524,9 +1594,13 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                       longTitleDisplay: settings.longTitleDisplay.toggled,
                     ),
                   ),
-                  title: const Text('Wrap long titles'),
+                  title: Text(AppLocalizations.of(context)!.wrapLongTitles),
                 ),
-              Text('Desktop font size: ${settings.nativeFontSize} pt'),
+              Text(
+                AppLocalizations.of(
+                  context,
+                )!.desktopFontSize(settings.nativeFontSize),
+              ),
               Slider(
                 value: settings.nativeFontSize.toDouble(),
                 min: 10,
@@ -1537,9 +1611,9 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                 ),
               ),
               const Divider(),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Tag names'),
+                child: Text(AppLocalizations.of(context)!.tagNames),
               ),
               for (final tag in TaskTag.values)
                 Padding(
@@ -1578,7 +1652,7 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                 alignment: Alignment.centerRight,
                 child: TextButton(
                   onPressed: () => _saveTagNames(settings),
-                  child: const Text('Save tag names'),
+                  child: Text(AppLocalizations.of(context)!.saveTagNames),
                 ),
               ),
             ],
@@ -1588,7 +1662,7 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Close'),
+          child: Text(AppLocalizations.of(context)!.close),
         ),
       ],
     );
@@ -1632,12 +1706,20 @@ class _TerminalToggle extends StatelessWidget {
   );
 }
 
-String _viewLabel(WorkspaceView view) => switch (view) {
-  WorkspaceView.list => 'LIST VIEW',
-  WorkspaceView.focus => 'DOING FOCUS',
-  WorkspaceView.completed => 'COMPLETED',
-  WorkspaceView.multi => 'MULTI VIEW',
-};
+String _viewLabel(WorkspaceView view, AppLocalizations strings) =>
+    switch (view) {
+      WorkspaceView.list => strings.listView,
+      WorkspaceView.focus => strings.doingFocus,
+      WorkspaceView.completed => strings.completed,
+      WorkspaceView.multi => strings.multiView,
+    };
+
+String _statusLabel(TaskStatus status, AppLocalizations strings) =>
+    switch (status) {
+      TaskStatus.pending => strings.pending,
+      TaskStatus.doing => strings.doing,
+      TaskStatus.done => strings.done,
+    };
 
 String _statusIcon(TaskStatus status) => switch (status) {
   TaskStatus.pending => '◌',
@@ -1686,16 +1768,19 @@ Future<void> _handleTaskAction(
           builder: (_) => AlertDialog(
             titlePadding: _dialogTitlePadding,
             contentPadding: _dialogContentPadding,
-            title: const Text('Delete task?', style: TextStyle(color: _red)),
-            content: const Text('This cannot be undone.'),
+            title: Text(
+              AppLocalizations.of(context)!.deleteTaskTitle,
+              style: const TextStyle(color: _red),
+            ),
+            content: Text(AppLocalizations.of(context)!.deleteTaskBody),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
+                child: Text(AppLocalizations.of(context)!.cancel),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Delete'),
+                child: Text(AppLocalizations.of(context)!.delete),
               ),
             ],
           ),
@@ -1707,7 +1792,9 @@ Future<void> _handleTaskAction(
   final draft = await showDialog<_TaskDraft>(
     context: context,
     builder: (_) => _TaskEditorDialog(
-      title: action == 'edit' ? 'Edit task' : 'Duplicate task',
+      title: action == 'edit'
+          ? AppLocalizations.of(context)!.editTask
+          : AppLocalizations.of(context)!.duplicateTask,
       initialTitle: task.title,
       initialDaily: task.daily,
     ),

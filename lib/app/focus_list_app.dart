@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation/workspace_screen.dart';
 import '../presentation/workspace_view_model.dart';
+import '../l10n/app_localizations.dart';
 import 'ui_mode.dart';
 
 class FocusListApp extends ConsumerWidget {
@@ -27,7 +28,9 @@ class FocusListApp extends ConsumerWidget {
     );
     final terminal = usesTerminalPresentation;
     return MaterialApp(
-      title: 'Focus List',
+      onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
         textTheme: terminal
