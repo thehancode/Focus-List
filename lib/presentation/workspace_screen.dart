@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,6 +26,13 @@ EdgeInsetsGeometry? get _dialogContentPadding =>
 
 TextStyle? _dialogInputStyle(BuildContext context) =>
     usesTerminalPresentation ? Theme.of(context).textTheme.bodyMedium : null;
+
+Color _tagColor(TaskTag tag) => switch (tag) {
+  TaskTag.spade => _violet,
+  TaskTag.heart => _red,
+  TaskTag.club => _green,
+  TaskTag.diamond => _amber,
+};
 
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key});
@@ -134,6 +142,14 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       }
       return KeyEventResult.handled;
     }
+    if (usesTerminalPresentation &&
+        event is KeyDownEvent &&
+        key == LogicalKeyboardKey.keyT) {
+      unawaited(
+        vm.cycleSelectedTag(HardwareKeyboard.instance.isShiftPressed ? 1 : 0),
+      );
+      return KeyEventResult.handled;
+    }
     if (_grabbed) {
       if (key == LogicalKeyboardKey.keyF) unawaited(vm.advanceSelectedTask());
       _releaseGrab();
@@ -192,6 +208,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     final vm = ref.read(workspaceViewModelProvider.notifier);
     if (edit) {
       await vm.updateSelectedTask(result.title, result.daily);
+    } else if (duplicate) {
+      await vm.duplicateSelectedTask(result.title, result.daily);
     } else {
       await vm.createTask(result.title, result.daily);
     }
@@ -285,6 +303,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
           'Space then F   Advance status\n'
           'Space then ↑/↓   Reorder in status\n'
           'N / E / D / X   New, edit, duplicate, delete task\n'
+          'T / Shift+T   Cycle first / second tag\n'
           'Tab / Shift+Tab   Switch task lists\n'
           'Ctrl+A   Multi view\n'
           'Ctrl+N   New list\n'
@@ -798,10 +817,12 @@ class _TaskRow extends ConsumerWidget {
         decoration: done ? TextDecoration.lineThrough : null,
       ),
     );
-    return Semantics(
+    final row = Semantics(
       selected: selected,
       button: true,
-      label: '${task.status.label} task: ${task.title}',
+      label:
+          '${task.status.label} task: ${task.title}'
+          '${task.tags.isEmpty ? '' : ', tags: ${task.tags.map(state.settings.tagNames.nameFor).join(', ')}'}',
       child: InkWell(
         onTap: () =>
             ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
@@ -837,6 +858,11 @@ class _TaskRow extends ConsumerWidget {
                 ),
               ),
               Expanded(child: title),
+              _TaskTags(
+                task: task,
+                settings: state.settings,
+                selected: selected,
+              ),
               if (task.daily)
                 terminal
                     ? Text(
@@ -907,7 +933,90 @@ class _TaskRow extends ConsumerWidget {
         ),
       ),
     );
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      return _AndroidTagSwipe(taskId: task.id, child: row);
+    }
+    return row;
   }
+}
+
+class _TaskTags extends StatelessWidget {
+  const _TaskTags({
+    required this.task,
+    required this.settings,
+    required this.selected,
+  });
+  final Task task;
+  final AppSettings settings;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final cell = TerminalMetrics.cell(context);
+    final cells = task.tags.length < 2 ? 2 : task.tags.length;
+    return SizedBox(
+      key: ValueKey('task-tags-${task.id}'),
+      width: cell * cells,
+      child: ColoredBox(
+        color: selected && task.tags.isNotEmpty
+            ? terminalBackground
+            : Colors.transparent,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            for (final tag in task.tags)
+              Tooltip(
+                message: settings.tagNames.nameFor(tag),
+                child: SizedBox(
+                  width: cell,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      tag.glyph,
+                      style: TextStyle(color: _tagColor(tag)),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AndroidTagSwipe extends ConsumerStatefulWidget {
+  const _AndroidTagSwipe({required this.taskId, required this.child});
+  final String taskId;
+  final Widget child;
+
+  @override
+  ConsumerState<_AndroidTagSwipe> createState() => _AndroidTagSwipeState();
+}
+
+class _AndroidTagSwipeState extends ConsumerState<_AndroidTagSwipe> {
+  double _distance = 0;
+
+  void _finish(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final shouldCycle = _distance.abs() >= 48 || velocity.abs() >= 450;
+    final left = _distance == 0 ? velocity < 0 : _distance < 0;
+    _distance = 0;
+    if (!shouldCycle) return;
+    final vm = ref.read(workspaceViewModelProvider.notifier);
+    vm.selectTask(widget.taskId);
+    unawaited(vm.cycleSelectedTag(left ? 0 : 1));
+  }
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    behavior: HitTestBehavior.translucent,
+    onHorizontalDragStart: (_) => _distance = 0,
+    onHorizontalDragUpdate: (details) => _distance += details.delta.dx,
+    onHorizontalDragEnd: _finish,
+    onHorizontalDragCancel: () => _distance = 0,
+    child: widget.child,
+  );
 }
 
 class _EmptyState extends StatelessWidget {
@@ -1108,6 +1217,7 @@ class _Footer extends ConsumerWidget {
               _TerminalCommand(keys: 'n', label: 'new', onTap: onNewTask),
               const _TerminalCommand(keys: 'space f', label: 'advance'),
               const _TerminalCommand(keys: 'space ↑↓', label: 'sort'),
+              const _TerminalCommand(keys: 't/shift+t', label: 'tags'),
               _TerminalCommand(
                 keys: 'ctrl+n',
                 label: 'new list',
@@ -1324,10 +1434,61 @@ class _ListEditorDialogState extends State<_ListEditorDialog> {
   );
 }
 
-class _SettingsDialog extends ConsumerWidget {
+class _SettingsDialog extends ConsumerStatefulWidget {
   const _SettingsDialog();
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_SettingsDialog> createState() => _SettingsDialogState();
+}
+
+class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
+  late final Map<TaskTag, TextEditingController> _tagControllers;
+  String? _tagError;
+
+  @override
+  void initState() {
+    super.initState();
+    final names = ref.read(workspaceViewModelProvider).settings.tagNames;
+    _tagControllers = {
+      for (final tag in TaskTag.values)
+        tag: TextEditingController(text: names.nameFor(tag)),
+    };
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _tagControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _saveTagNames(AppSettings settings) async {
+    final values = {
+      for (final entry in _tagControllers.entries)
+        entry.key: normalizeName(entry.value.text),
+    };
+    if (values.values.any((value) => value.isEmpty)) {
+      setState(() => _tagError = 'Tag names cannot be empty');
+      return;
+    }
+    setState(() => _tagError = null);
+    await ref
+        .read(workspaceViewModelProvider.notifier)
+        .updateSettings(
+          settings.copyWith(
+            tagNames: TagNames(
+              spade: values[TaskTag.spade]!,
+              heart: values[TaskTag.heart]!,
+              club: values[TaskTag.club]!,
+              diamond: values[TaskTag.diamond]!,
+            ),
+          ),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(workspaceViewModelProvider).settings;
     final vm = ref.read(workspaceViewModelProvider.notifier);
     return AlertDialog(
@@ -1336,50 +1497,97 @@ class _SettingsDialog extends ConsumerWidget {
       title: const Text('Settings'),
       content: SizedBox(
         width: 420,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Marquee speed: ${settings.marqueeSpeedMs} ms'),
-            Slider(
-              value: settings.marqueeSpeedMs.toDouble(),
-              min: minMarqueeSpeedMs.toDouble(),
-              max: maxMarqueeSpeedMs.toDouble(),
-              divisions: (maxMarqueeSpeedMs - minMarqueeSpeedMs) ~/ 25,
-              onChanged: (value) => vm.updateSettings(
-                settings.copyWith(marqueeSpeedMs: (value / 25).round() * 25),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Marquee speed: ${settings.marqueeSpeedMs} ms'),
+              Slider(
+                value: settings.marqueeSpeedMs.toDouble(),
+                min: minMarqueeSpeedMs.toDouble(),
+                max: maxMarqueeSpeedMs.toDouble(),
+                divisions: (maxMarqueeSpeedMs - minMarqueeSpeedMs) ~/ 25,
+                onChanged: (value) => vm.updateSettings(
+                  settings.copyWith(marqueeSpeedMs: (value / 25).round() * 25),
+                ),
               ),
-            ),
-            if (usesTerminalPresentation)
-              _TerminalToggle(
-                value: settings.longTitleDisplay == LongTitleDisplay.wrap,
-                onChanged: (_) => vm.updateSettings(
-                  settings.copyWith(
-                    longTitleDisplay: settings.longTitleDisplay.toggled,
+              if (usesTerminalPresentation)
+                _TerminalToggle(
+                  value: settings.longTitleDisplay == LongTitleDisplay.wrap,
+                  onChanged: (_) => vm.updateSettings(
+                    settings.copyWith(
+                      longTitleDisplay: settings.longTitleDisplay.toggled,
+                    ),
+                  ),
+                  label: 'Wrap long titles',
+                )
+              else
+                SwitchListTile(
+                  value: settings.longTitleDisplay == LongTitleDisplay.wrap,
+                  onChanged: (_) => vm.updateSettings(
+                    settings.copyWith(
+                      longTitleDisplay: settings.longTitleDisplay.toggled,
+                    ),
+                  ),
+                  title: const Text('Wrap long titles'),
+                ),
+              Text('Desktop font size: ${settings.nativeFontSize} pt'),
+              Slider(
+                value: settings.nativeFontSize.toDouble(),
+                min: 10,
+                max: 28,
+                divisions: 18,
+                onChanged: (value) => vm.updateSettings(
+                  settings.copyWith(nativeFontSize: value.round()),
+                ),
+              ),
+              const Divider(),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Tag names'),
+              ),
+              for (final tag in TaskTag.values)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: TerminalMetrics.cell(context) * 2,
+                        child: Text(
+                          tag.glyph,
+                          style: TextStyle(
+                            color: _tagColor(tag),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          key: ValueKey('tag-name-${tag.wireName}'),
+                          controller: _tagControllers[tag],
+                          style: _dialogInputStyle(context),
+                          decoration: InputDecoration(
+                            labelText: const TagNames().nameFor(tag),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                label: 'Wrap long titles',
-              )
-            else
-              SwitchListTile(
-                value: settings.longTitleDisplay == LongTitleDisplay.wrap,
-                onChanged: (_) => vm.updateSettings(
-                  settings.copyWith(
-                    longTitleDisplay: settings.longTitleDisplay.toggled,
-                  ),
+              if (_tagError != null)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(_tagError!, style: const TextStyle(color: _red)),
                 ),
-                title: const Text('Wrap long titles'),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => _saveTagNames(settings),
+                  child: const Text('Save tag names'),
+                ),
               ),
-            Text('Desktop font size: ${settings.nativeFontSize} pt'),
-            Slider(
-              value: settings.nativeFontSize.toDouble(),
-              min: 10,
-              max: 28,
-              divisions: 18,
-              onChanged: (value) => vm.updateSettings(
-                settings.copyWith(nativeFontSize: value.round()),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       actions: [

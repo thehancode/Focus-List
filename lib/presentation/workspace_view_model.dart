@@ -296,7 +296,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     tasks: const [],
   );
 
-  Task _newTask(String title, bool daily) {
+  Task _newTask(String title, bool daily, {List<TaskTag> tags = const []}) {
     final now = DateTime.now().toUtc();
     return Task(
       id: _uuid.v4(),
@@ -307,6 +307,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       completedAt: null,
       daily: daily,
       completionHistory: const [],
+      tags: tags,
     );
   }
 
@@ -506,8 +507,19 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     );
   }
 
-  Future<bool> duplicateSelectedTask(String input, bool daily) =>
-      createTask(input, daily);
+  Future<bool> duplicateSelectedTask(String input, bool daily) async {
+    final title = normalizeName(input);
+    if (title.isEmpty) return _error('A name cannot be empty');
+    final list = state.selectedTaskList;
+    final selected = state.selectedTask;
+    if (list == null || selected == null) return false;
+    final task = _newTask(title, daily, tags: selected.tags);
+    return _saveList(
+      list.copyWith(tasks: [...list.tasks, task]),
+      success: 'Task duplicated',
+      selectedTaskId: task.id,
+    );
+  }
 
   Future<bool> deleteSelectedTask() async {
     final list = state.selectedTaskList;
@@ -521,6 +533,53 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       state = _withFirstVisibleSelected(state.copyWith(clearSelection: true));
     }
     return result;
+  }
+
+  Future<bool> cycleSelectedTag(int index) async {
+    if (index < 0) return false;
+    final list = state.selectedTaskList;
+    final selected = state.selectedTask;
+    if (list == null || selected == null) return false;
+
+    final tags = selected.tags.toList(growable: true);
+    final current = index < tags.length ? tags[index] : null;
+    final cycle = <TaskTag?>[null, ...TaskTag.values];
+    final start = cycle.indexOf(current);
+    TaskTag? next;
+    for (var offset = 1; offset <= cycle.length; offset++) {
+      final candidate = cycle[(start + offset) % cycle.length];
+      if (candidate == null ||
+          !tags.asMap().entries.any(
+            (entry) => entry.key != index && entry.value == candidate,
+          )) {
+        next = candidate;
+        break;
+      }
+    }
+
+    if (next == null) {
+      if (index < tags.length) tags.removeAt(index);
+    } else if (index < tags.length) {
+      tags[index] = next;
+    } else {
+      tags.add(next);
+    }
+    final updated = selected.copyWith(
+      tags: tags,
+      updatedAt: DateTime.now().toUtc(),
+    );
+    final label = next == null
+        ? 'Tag removed'
+        : 'Tagged ${state.settings.tagNames.nameFor(next)}';
+    return _saveList(
+      list.copyWith(
+        tasks: [
+          for (final task in list.tasks)
+            if (task.id == selected.id) updated else task,
+        ],
+      ),
+      success: label,
+    );
   }
 
   Future<bool> advanceSelectedTask() async {

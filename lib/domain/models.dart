@@ -7,6 +7,27 @@ const int maxMarqueeSpeedMs = 1000;
 
 enum TaskStatus { pending, doing, done }
 
+enum TaskTag { spade, heart, club, diamond }
+
+extension TaskTagX on TaskTag {
+  String get wireName => name;
+
+  String get glyph => switch (this) {
+    TaskTag.spade => '♠',
+    TaskTag.heart => '♥',
+    TaskTag.club => '♣',
+    TaskTag.diamond => '♦',
+  };
+
+  static TaskTag fromWireName(Object? value) => switch (value) {
+    'spade' => TaskTag.spade,
+    'heart' => TaskTag.heart,
+    'club' => TaskTag.club,
+    'diamond' => TaskTag.diamond,
+    _ => throw FormatException('Unknown task tag: $value'),
+  };
+}
+
 extension TaskStatusX on TaskStatus {
   String get wireName => name;
 
@@ -56,7 +77,9 @@ class Task {
     required this.completedAt,
     required this.daily,
     required List<DateTime> completionHistory,
-  }) : completionHistory = UnmodifiableListView<DateTime>(completionHistory);
+    List<TaskTag> tags = const [],
+  }) : completionHistory = UnmodifiableListView<DateTime>(completionHistory),
+       tags = UnmodifiableListView<TaskTag>(tags);
 
   final String id;
   final String title;
@@ -66,6 +89,7 @@ class Task {
   final DateTime? completedAt;
   final bool daily;
   final UnmodifiableListView<DateTime> completionHistory;
+  final UnmodifiableListView<TaskTag> tags;
 
   Task copyWith({
     String? title,
@@ -75,6 +99,7 @@ class Task {
     bool clearCompletedAt = false,
     bool? daily,
     List<DateTime>? completionHistory,
+    List<TaskTag>? tags,
   }) => Task(
     id: id,
     title: title ?? this.title,
@@ -84,6 +109,7 @@ class Task {
     completedAt: clearCompletedAt ? null : (completedAt ?? this.completedAt),
     daily: daily ?? this.daily,
     completionHistory: completionHistory ?? this.completionHistory,
+    tags: tags ?? this.tags,
   );
 
   Map<String, Object?> toJson() => {
@@ -99,6 +125,8 @@ class Task {
       'completion_history': completionHistory
           .map((value) => value.toUtc().toIso8601String())
           .toList(growable: false),
+    if (tags.isNotEmpty)
+      'tags': tags.map((tag) => tag.wireName).toList(growable: false),
   };
 
   factory Task.fromJson(Map<String, Object?> json) {
@@ -117,6 +145,9 @@ class Task {
           : _date(json['completed_at'], 'task.completed_at'),
       daily: json['daily'] as bool? ?? false,
       completionHistory: history,
+      tags: (json['tags'] as List<Object?>? ?? const <Object?>[])
+          .map(TaskTagX.fromWireName)
+          .toList(growable: false),
     );
   }
 }
@@ -178,6 +209,66 @@ class TaskList {
     if (tasks.any((task) => task.title.trim().isEmpty)) {
       throw const FormatException('Task title is empty');
     }
+    if (tasks.any(
+      (task) =>
+          task.tags.length > TaskTag.values.length ||
+          task.tags.toSet().length != task.tags.length,
+    )) {
+      throw const FormatException('Task tags must be unique known tags');
+    }
+  }
+}
+
+class TagNames {
+  const TagNames({
+    this.spade = 'Spade',
+    this.heart = 'Heart',
+    this.club = 'Club',
+    this.diamond = 'Diamond',
+  });
+
+  final String spade;
+  final String heart;
+  final String club;
+  final String diamond;
+
+  String nameFor(TaskTag tag) => switch (tag) {
+    TaskTag.spade => spade,
+    TaskTag.heart => heart,
+    TaskTag.club => club,
+    TaskTag.diamond => diamond,
+  };
+
+  TagNames copyWith({
+    String? spade,
+    String? heart,
+    String? club,
+    String? diamond,
+  }) => TagNames(
+    spade: spade ?? this.spade,
+    heart: heart ?? this.heart,
+    club: club ?? this.club,
+    diamond: diamond ?? this.diamond,
+  );
+
+  Map<String, Object?> toJson() => {
+    'spade': spade,
+    'heart': heart,
+    'club': club,
+    'diamond': diamond,
+  };
+
+  factory TagNames.fromJson(Map<String, Object?>? json) => TagNames(
+    spade: json?['spade'] as String? ?? 'Spade',
+    heart: json?['heart'] as String? ?? 'Heart',
+    club: json?['club'] as String? ?? 'Club',
+    diamond: json?['diamond'] as String? ?? 'Diamond',
+  );
+
+  void validate() {
+    if ([spade, heart, club, diamond].any((name) => name.trim().isEmpty)) {
+      throw const FormatException('Tag names must not be empty');
+    }
   }
 }
 
@@ -186,26 +277,31 @@ class AppSettings {
     this.marqueeSpeedMs = defaultMarqueeSpeedMs,
     this.longTitleDisplay = LongTitleDisplay.marquee,
     this.nativeFontSize = 16,
+    this.tagNames = const TagNames(),
   });
 
   final int marqueeSpeedMs;
   final LongTitleDisplay longTitleDisplay;
   final int nativeFontSize;
+  final TagNames tagNames;
 
   AppSettings copyWith({
     int? marqueeSpeedMs,
     LongTitleDisplay? longTitleDisplay,
     int? nativeFontSize,
+    TagNames? tagNames,
   }) => AppSettings(
     marqueeSpeedMs: marqueeSpeedMs ?? this.marqueeSpeedMs,
     longTitleDisplay: longTitleDisplay ?? this.longTitleDisplay,
     nativeFontSize: nativeFontSize ?? this.nativeFontSize,
+    tagNames: tagNames ?? this.tagNames,
   );
 
   Map<String, Object?> toJson() => {
     'marquee_speed_ms': marqueeSpeedMs,
     'long_title_display': longTitleDisplay.wireName,
     'native_font_size': nativeFontSize,
+    'tag_names': tagNames.toJson(),
   };
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
@@ -214,6 +310,11 @@ class AppSettings {
       json['long_title_display'],
     ),
     nativeFontSize: json['native_font_size'] as int? ?? 16,
+    tagNames: TagNames.fromJson(
+      json['tag_names'] == null
+          ? null
+          : Map<String, Object?>.from(json['tag_names']! as Map),
+    ),
   );
 
   void validate() {
@@ -226,6 +327,7 @@ class AppSettings {
     if (nativeFontSize < 10 || nativeFontSize > 28) {
       throw const FormatException('native_font_size must be between 10 and 28');
     }
+    tagNames.validate();
   }
 }
 

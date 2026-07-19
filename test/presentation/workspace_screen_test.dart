@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -170,6 +171,143 @@ void main() {
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets('T and Shift+T cycle two colored terminal tags', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([_listWithTask()]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.pump();
+    expect(find.text('♠'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('♠')).style?.color, terminalViolet);
+    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.keyT);
+    await tester.pump();
+    expect(find.text('♠'), findsOneWidget);
+    expect(find.text('♥'), findsNothing);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pump();
+    expect(find.text('♥'), findsOneWidget);
+    expect(tester.widget<Text>(find.text('♥')).style?.color, terminalRed);
+    expect(
+      tester.getSize(find.byKey(const ValueKey('task-tags-task-1'))).width,
+      closeTo(
+        TerminalMetrics.cell(
+              tester.element(find.byKey(const ValueKey('task-tags-task-1'))),
+            ) *
+            2,
+        .01,
+      ),
+    );
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('Android swipes cycle first and second tags without dismissal', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(900, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([_listWithTask()]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final task = find.bySemanticsLabel(RegExp('Pending task: Swipe me'));
+    await tester.drag(task, const Offset(-100, 0));
+    await tester.pumpAndSettle();
+    expect(task, findsOneWidget);
+    expect(find.text('♠'), findsOneWidget);
+
+    await tester.drag(task, const Offset(100, 0));
+    await tester.pumpAndSettle();
+    expect(task, findsOneWidget);
+    expect(find.text('♥'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('configured tag names update task semantics', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([
+              _listWithTask(tags: const [TaskTag.heart]),
+            ]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyG);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('tag-name-heart')),
+      'Urgent',
+    );
+    await tester.tap(find.text('Save tag names'));
+    await tester.pump();
+    await tester.tap(find.text('Close'));
+    await tester.pumpAndSettle();
+
+    expect(find.bySemanticsLabel(RegExp('tags: Urgent')), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+}
+
+TaskList _listWithTask({List<TaskTag> tags = const []}) {
+  final now = DateTime.utc(2026, 1, 1);
+  return TaskList(
+    schemaVersion: currentSchemaVersion,
+    id: 'list-1',
+    name: 'Tasks',
+    createdAt: now,
+    tasks: [
+      Task(
+        id: 'task-1',
+        title: 'Swipe me',
+        status: TaskStatus.pending,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: null,
+        daily: false,
+        completionHistory: const [],
+        tags: tags,
+      ),
+    ],
+  );
 }
 
 class _Lists implements TaskListRepository {

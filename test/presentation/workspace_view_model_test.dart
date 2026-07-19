@@ -65,6 +65,39 @@ void main() {
       expect(saved.tasks.map((task) => task.id), ['second', 'doing', 'first']);
     },
   );
+
+  test('tag slots cycle, skip duplicates, compact, and persist', () async {
+    final list = _list('tasks', 'Tasks', [_task('first', 'First')]);
+    final repository = _TaskLists([list]);
+    final container = _container([list], repository: repository);
+    addTearDown(container.dispose);
+    final vm = await _ready(container);
+
+    await vm.cycleSelectedTag(0);
+    expect(repository.lists.single.tasks.single.tags, [TaskTag.spade]);
+
+    await vm.cycleSelectedTag(1);
+    expect(repository.lists.single.tasks.single.tags, [
+      TaskTag.spade,
+      TaskTag.heart,
+    ]);
+
+    await vm.cycleSelectedTag(0);
+    expect(repository.lists.single.tasks.single.tags, [
+      TaskTag.club,
+      TaskTag.heart,
+    ]);
+    await vm.cycleSelectedTag(0);
+    await vm.cycleSelectedTag(0);
+    expect(repository.lists.single.tasks.single.tags, [TaskTag.heart]);
+    expect(
+      repository.lists.single.tasks.single.updatedAt,
+      isNot(DateTime.utc(2026, 1, 1)),
+    );
+
+    await vm.duplicateSelectedTask('Copy', false);
+    expect(repository.lists.single.tasks.last.tags, [TaskTag.heart]);
+  });
 }
 
 ProviderContainer _container(
