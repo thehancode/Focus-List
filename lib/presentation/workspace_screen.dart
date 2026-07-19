@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../app/ui_mode.dart';
 import '../domain/models.dart';
@@ -318,6 +319,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
         padding: EdgeInsets.all(terminal ? 0 : 12),
         child: Column(
           children: [
+            if (usesFramelessDesktopWindow) const _DesktopWindowDragArea(),
             _Header(
               state: state,
               onNewTask: _showTaskEditor,
@@ -370,6 +372,27 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       ),
     );
   }
+}
+
+class _DesktopWindowDragArea extends StatelessWidget {
+  const _DesktopWindowDragArea();
+
+  @override
+  Widget build(BuildContext context) => KeyedSubtree(
+    key: const Key('desktop-window-drag-area'),
+    child: Semantics(
+      label: 'Drag window',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.move,
+        child: DragToMoveArea(
+          child: SizedBox(
+            width: double.infinity,
+            height: TerminalMetrics.line(context),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _Header extends ConsumerWidget {

@@ -9,3 +9,17 @@ bool usesTerminalPresentationFor({
   required bool isWeb,
   required TargetPlatform platform,
 }) => isWeb || platform == TargetPlatform.linux;
+
+/// Linux and Windows use a frameless native window, so Flutter provides the
+/// replacement drag area.
+bool get usesFramelessDesktopWindow => usesFramelessDesktopWindowFor(
+  isWeb: kIsWeb,
+  platform: defaultTargetPlatform,
+);
+
+bool usesFramelessDesktopWindowFor({
+  required bool isWeb,
+  required TargetPlatform platform,
+}) =>
+    !isWeb &&
+    (platform == TargetPlatform.linux || platform == TargetPlatform.windows);

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/focus_list_app.dart';
+import 'app/ui_mode.dart';
 
 bool get isDesktop =>
     !kIsWeb &&
@@ -19,10 +20,13 @@ Future<void> main() async {
 
   if (isDesktop) {
     await windowManager.ensureInitialized();
-    const options = WindowOptions(
-      size: Size(1100, 720),
-      minimumSize: Size(720, 480),
+    final options = WindowOptions(
+      size: const Size(1100, 720),
+      minimumSize: const Size(720, 480),
       title: 'TUI Kanban',
+      titleBarStyle: usesFramelessDesktopWindow
+          ? TitleBarStyle.hidden
+          : TitleBarStyle.normal,
     );
     await windowManager.waitUntilReadyToShow(options, () async {
       await windowManager.show();

@@ -7,6 +7,7 @@ import 'package:flutter_app/app/focus_list_app.dart';
 import 'package:flutter_app/data/providers.dart';
 import 'package:flutter_app/domain/models.dart';
 import 'package:flutter_app/domain/repositories.dart';
+import 'package:flutter_app/presentation/terminal_style.dart';
 
 void main() {
   testWidgets('workspace loads its default list and exposes pointer commands', (
@@ -29,6 +30,12 @@ void main() {
 
     expect(find.textContaining('FOCUS LIST'), findsOneWidget);
     expect(find.textContaining('Tasks'), findsOneWidget);
+    final dragArea = find.byKey(const Key('desktop-window-drag-area'));
+    expect(dragArea, findsOneWidget);
+    expect(
+      tester.getSize(dragArea).height,
+      TerminalMetrics.line(tester.element(dragArea)),
+    );
     expect(find.bySemanticsLabel(RegExp('new command')), findsOneWidget);
     expect(
       find.bySemanticsLabel(RegExp('new list command'), skipOffstage: false),
