@@ -34,7 +34,7 @@
   "@deleteListBody": { "description": "Delete-list confirmation; listName is user-created text.", "placeholders": { "listName": {} } },
   "keyboardShortcuts": "Keyboard shortcuts",
   "@keyboardShortcuts": {"description": "Title of the shortcut-reference dialog."},
-  "keyboardShortcutsHelp": "↑/↓ or J/K   Move selection\\nSpace then F   Advance status\\nSpace then ↑/↓   Reorder in status\\nN / E / D / X   New, edit, duplicate, delete task\\nT / Shift+T   Cycle first / second tag\\nTab / Shift+Tab   Switch task lists\\nCtrl+A   Multi view\\nCtrl+N   New list\\nF2 / Ctrl+R   Rename list\\nCtrl+X   Delete list\\nC   Doing focus\\nV   Completed history\\nG   Settings\\nS   Sound\\nQ   Quit",
+  "keyboardShortcutsHelp": "↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder in status\nN / E / D / X   New, edit, duplicate, delete task\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit",
   "@keyboardShortcutsHelp": {"description": "Multiline desktop shortcut reference. Keep key glyphs and line breaks."},
   "couldNotLoad": "Could not load Focus List",
   "@couldNotLoad": {"description": "Fallback workspace loading error."},
@@ -148,8 +148,6 @@
   "@language": {"description": "Settings row label for the application's display language."},
   "languageValue": "Language: {language}",
   "@languageValue": {"description": "Terminal settings control showing the selected display language.", "placeholders": {"language": {}}},
-  "languageEnglish": "English",
-  "@languageEnglish": {"description": "Name of the English display language."},
-  "languageSpanish": "Spanish",
-  "@languageSpanish": {"description": "Name of the Spanish display language."}
+  "languageName": "English",
+  "@languageName": {"description": "Native name of this locale, shown in the language selector."}
 }

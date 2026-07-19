@@ -1612,24 +1612,27 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
               ),
               if (usesTerminalPresentation)
                 _TerminalLanguageControl(
-                  language: settings.language,
+                  languageLocale: settings.languageLocale,
                   onTap: () => vm.updateSettings(
-                    settings.copyWith(language: settings.language.next),
+                    settings.copyWith(
+                      languageLocale: _nextLanguageLocale(
+                        settings.languageLocale,
+                      ),
+                    ),
                   ),
                 )
               else
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   title: Text(AppLocalizations.of(context)!.language),
-                  subtitle: Text(
-                    _languageLabel(
-                      settings.language,
-                      AppLocalizations.of(context)!,
-                    ),
-                  ),
+                  subtitle: Text(_languageLabel(settings.languageLocale)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => vm.updateSettings(
-                    settings.copyWith(language: settings.language.next),
+                    settings.copyWith(
+                      languageLocale: _nextLanguageLocale(
+                        settings.languageLocale,
+                      ),
+                    ),
                   ),
                 ),
               const Divider(),
@@ -1729,9 +1732,12 @@ class _TerminalToggle extends StatelessWidget {
 }
 
 class _TerminalLanguageControl extends StatelessWidget {
-  const _TerminalLanguageControl({required this.language, required this.onTap});
+  const _TerminalLanguageControl({
+    required this.languageLocale,
+    required this.onTap,
+  });
 
-  final AppLanguage language;
+  final String languageLocale;
   final VoidCallback onTap;
 
   @override
@@ -1739,12 +1745,12 @@ class _TerminalLanguageControl extends StatelessWidget {
     final strings = AppLocalizations.of(context)!;
     return Semantics(
       button: true,
-      label: strings.languageValue(_languageLabel(language, strings)),
+      label: strings.languageValue(_languageLabel(languageLocale)),
       child: InkWell(
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 1),
-          child: Text(strings.languageValue(_languageLabel(language, strings))),
+          child: Text(strings.languageValue(_languageLabel(languageLocale))),
         ),
       ),
     );
@@ -1766,11 +1772,23 @@ String _statusLabel(TaskStatus status, AppLocalizations strings) =>
       TaskStatus.done => strings.done,
     };
 
-String _languageLabel(AppLanguage language, AppLocalizations strings) =>
-    switch (language) {
-      AppLanguage.english => strings.languageEnglish,
-      AppLanguage.spanish => strings.languageSpanish,
-    };
+String _languageLabel(String localeName) =>
+    lookupAppLocalizations(_supportedLanguageLocale(localeName)).languageName;
+
+String _nextLanguageLocale(String currentLocale) {
+  final locales = AppLocalizations.supportedLocales;
+  final currentIndex = locales.indexWhere(
+    (locale) => locale.toString() == currentLocale,
+  );
+  return locales[(currentIndex + 1) % locales.length].toString();
+}
+
+Locale _supportedLanguageLocale(String localeName) {
+  for (final locale in AppLocalizations.supportedLocales) {
+    if (locale.toString() == localeName) return locale;
+  }
+  return AppLocalizations.supportedLocales.first;
+}
 
 String _statusIcon(TaskStatus status) => switch (status) {
   TaskStatus.pending => '◌',

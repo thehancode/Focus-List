@@ -96,6 +96,8 @@ abstract class AppLocalizations {
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
     Locale('es'),
+    Locale('es', '419'),
+    Locale('es', 'ES'),
   ];
 
   /// Application title used by Flutter.
@@ -203,7 +205,7 @@ abstract class AppLocalizations {
   /// Multiline desktop shortcut reference. Keep key glyphs and line breaks.
   ///
   /// In en, this message translates to:
-  /// **'↑/↓ or J/K   Move selection\\nSpace then F   Advance status\\nSpace then ↑/↓   Reorder in status\\nN / E / D / X   New, edit, duplicate, delete task\\nT / Shift+T   Cycle first / second tag\\nTab / Shift+Tab   Switch task lists\\nCtrl+A   Multi view\\nCtrl+N   New list\\nF2 / Ctrl+R   Rename list\\nCtrl+X   Delete list\\nC   Doing focus\\nV   Completed history\\nG   Settings\\nS   Sound\\nQ   Quit'**
+  /// **'↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder in status\nN / E / D / X   New, edit, duplicate, delete task\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
   String get keyboardShortcutsHelp;
 
   /// Fallback workspace loading error.
@@ -542,17 +544,11 @@ abstract class AppLocalizations {
   /// **'Language: {language}'**
   String languageValue(Object language);
 
-  /// Name of the English display language.
+  /// Native name of this locale, shown in the language selector.
   ///
   /// In en, this message translates to:
   /// **'English'**
-  String get languageEnglish;
-
-  /// Name of the Spanish display language.
-  ///
-  /// In en, this message translates to:
-  /// **'Spanish'**
-  String get languageSpanish;
+  String get languageName;
 }
 
 class _AppLocalizationsDelegate
@@ -573,6 +569,20 @@ class _AppLocalizationsDelegate
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
+  // Lookup logic when language+country codes are specified.
+  switch (locale.languageCode) {
+    case 'es':
+      {
+        switch (locale.countryCode) {
+          case '419':
+            return AppLocalizationsEs419();
+          case 'ES':
+            return AppLocalizationsEsEs();
+        }
+        break;
+      }
+  }
+
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
     case 'en':

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../presentation/workspace_screen.dart';
 import '../presentation/workspace_view_model.dart';
 import '../l10n/app_localizations.dart';
-import '../domain/models.dart';
 import 'ui_mode.dart';
 
 class FocusListApp extends ConsumerWidget {
@@ -32,8 +31,8 @@ class FocusListApp extends ConsumerWidget {
       onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      locale: Locale(
-        ref.watch(workspaceViewModelProvider).settings.language.localeCode,
+      locale: _supportedLocale(
+        ref.watch(workspaceViewModelProvider).settings.languageLocale,
       ),
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
@@ -156,6 +155,13 @@ class FocusListApp extends ConsumerWidget {
       home: const WorkspaceScreen(),
     );
   }
+}
+
+Locale _supportedLocale(String localeName) {
+  for (final locale in AppLocalizations.supportedLocales) {
+    if (locale.toString() == localeName) return locale;
+  }
+  return AppLocalizations.supportedLocales.first;
 }
 
 TextTheme _terminalTextTheme(TextTheme textTheme) => textTheme.copyWith(

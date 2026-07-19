@@ -4,6 +4,10 @@
 Every visible UI message belongs in this catalog. Keep each message key stable;
 renaming a key breaks generated Dart call sites and every translation.
 
+Focus List is the product name. Keep appTitle, windowTitle, and
+workspaceTitle as Focus List in every locale; product names are not
+translated.
+
 ## Adding or updating a translation
 
 - Add or update `app_<language>.arb`, preserving every message key and every
@@ -20,7 +24,7 @@ renaming a key breaks generated Dart call sites and every translation.
 
 ## Language setting
 
-Supported application languages are declared by `AppLanguage` in
-`lib/domain/models.dart`. Adding a locale requires its ARB catalog, an enum
-value with a stable locale code, a localized language name in every catalog,
-and inclusion in the cycle control in `workspace_screen.dart`.
+Supported application languages are discovered from generated
+`AppLocalizations.supportedLocales`. Adding a locale requires an ARB catalog
+with its `@@locale` and a native `languageName` message. The language selector
+then includes it automatically after `flutter gen-l10n`.

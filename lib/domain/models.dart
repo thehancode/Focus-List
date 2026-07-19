@@ -67,26 +67,6 @@ extension LongTitleDisplayX on LongTitleDisplay {
   };
 }
 
-enum AppLanguage { english, spanish }
-
-extension AppLanguageX on AppLanguage {
-  String get localeCode => switch (this) {
-    AppLanguage.english => 'en',
-    AppLanguage.spanish => 'es',
-  };
-
-  AppLanguage get next => switch (this) {
-    AppLanguage.english => AppLanguage.spanish,
-    AppLanguage.spanish => AppLanguage.english,
-  };
-
-  static AppLanguage fromLocaleCode(Object? value) => switch (value) {
-    'es' => AppLanguage.spanish,
-    null || 'en' => AppLanguage.english,
-    _ => AppLanguage.english,
-  };
-}
-
 class Task {
   Task({
     required this.id,
@@ -298,27 +278,30 @@ class AppSettings {
     this.longTitleDisplay = LongTitleDisplay.marquee,
     this.nativeFontSize = 16,
     this.tagNames = const TagNames(),
-    this.language = AppLanguage.english,
+    this.languageLocale = 'en',
   });
 
   final int marqueeSpeedMs;
   final LongTitleDisplay longTitleDisplay;
   final int nativeFontSize;
   final TagNames tagNames;
-  final AppLanguage language;
+
+  /// BCP-47-style locale identifier selected by the user (for example `es_419`).
+  /// The presentation layer matches this against generated localization catalogs.
+  final String languageLocale;
 
   AppSettings copyWith({
     int? marqueeSpeedMs,
     LongTitleDisplay? longTitleDisplay,
     int? nativeFontSize,
     TagNames? tagNames,
-    AppLanguage? language,
+    String? languageLocale,
   }) => AppSettings(
     marqueeSpeedMs: marqueeSpeedMs ?? this.marqueeSpeedMs,
     longTitleDisplay: longTitleDisplay ?? this.longTitleDisplay,
     nativeFontSize: nativeFontSize ?? this.nativeFontSize,
     tagNames: tagNames ?? this.tagNames,
-    language: language ?? this.language,
+    languageLocale: languageLocale ?? this.languageLocale,
   );
 
   Map<String, Object?> toJson() => {
@@ -326,7 +309,7 @@ class AppSettings {
     'long_title_display': longTitleDisplay.wireName,
     'native_font_size': nativeFontSize,
     'tag_names': tagNames.toJson(),
-    'language': language.localeCode,
+    'language': languageLocale,
   };
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
@@ -340,7 +323,7 @@ class AppSettings {
           ? null
           : Map<String, Object?>.from(json['tag_names']! as Map),
     ),
-    language: AppLanguageX.fromLocaleCode(json['language']),
+    languageLocale: json['language'] as String? ?? 'en',
   );
 
   void validate() {
