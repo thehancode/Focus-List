@@ -12,11 +12,31 @@ const terminalRed = Color(0xfff4707a);
 
 /// Pixel equivalents of the Rust UI's character-cell layout.
 abstract final class TerminalMetrics {
-  static const double cell = 8;
-  static const double line = 24;
   static const double panelRadius = 6;
-  static const EdgeInsets panelPadding = EdgeInsets.symmetric(
-    horizontal: cell,
-    vertical: 4,
+
+  static double fontSize(BuildContext context) =>
+      Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14;
+
+  /// Ubuntu Mono is approximately 0.61 em wide.
+  static double cell(BuildContext context) =>
+      (fontSize(context) * .61).clamp(6, double.infinity);
+
+  /// Measure the font's real line box instead of approximating it from points.
+  static double line(BuildContext context) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: '█Mg',
+        style: Theme.of(context).textTheme.bodyMedium,
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    return painter.height + 4;
+  }
+
+  static EdgeInsets panelPadding(BuildContext context) => EdgeInsets.symmetric(
+    horizontal: cell(context),
+    vertical: line(context) * .16,
   );
 }

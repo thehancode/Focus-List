@@ -68,10 +68,56 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     },
   );
+
+  testWidgets('terminal rows grow with the configured font size', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final now = DateTime.utc(2026, 1, 1);
+    final task = Task(
+      id: 'task-1',
+      title: 'Large terminal text',
+      status: TaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+    );
+    final list = TaskList(
+      schemaVersion: 1,
+      id: 'list-1',
+      name: 'Tasks',
+      createdAt: now,
+      tasks: [task],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(
+            _Settings(const AppSettings(nativeFontSize: 28)),
+          ),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final taskRow = find.bySemanticsLabel(RegExp('Pending task'));
+    expect(taskRow, findsOneWidget);
+    expect(tester.getSize(taskRow).height, greaterThan(36));
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
 }
 
 class _Lists implements TaskListRepository {
-  final List<TaskList> _lists = [];
+  _Lists([List<TaskList> lists = const []]) : _lists = List.of(lists);
+  final List<TaskList> _lists;
 
   @override
   Future<void> delete(String listId) async {
@@ -80,7 +126,7 @@ class _Lists implements TaskListRepository {
 
   @override
   Future<TaskListLoadResult> loadAll() async =>
-      const TaskListLoadResult(lists: [], warnings: []);
+      TaskListLoadResult(lists: List.of(_lists), warnings: const []);
 
   @override
   Future<void> save(TaskList list) async {
@@ -90,8 +136,11 @@ class _Lists implements TaskListRepository {
 }
 
 class _Settings implements SettingsRepository {
+  const _Settings([this.settings = const AppSettings()]);
+  final AppSettings settings;
+
   @override
-  Future<AppSettings> load() async => const AppSettings();
+  Future<AppSettings> load() async => settings;
 
   @override
   Future<void> save(AppSettings settings) async {}
