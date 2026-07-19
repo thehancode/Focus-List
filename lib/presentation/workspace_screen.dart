@@ -824,26 +824,25 @@ class _TaskScrollViewState extends State<_TaskScrollView> {
   }
 
   @override
-  Widget build(BuildContext context) => Stack(
+  Widget build(BuildContext context) => Column(
     children: [
-      Positioned.fill(
+      if (_canScrollUp)
+        _TaskOverflowIndicator(
+          key: const ValueKey('task-overflow-up'),
+          glyph: '▲',
+          color: widget.indicatorColor,
+        ),
+      Expanded(
         child: ListView(
+          key: const ValueKey('task-list-viewport'),
           controller: _controller,
           padding: widget.padding,
           children: widget.children,
         ),
       ),
-      if (_canScrollUp)
-        _TaskOverflowIndicator(
-          key: const ValueKey('task-overflow-up'),
-          alignment: Alignment.topCenter,
-          glyph: '▲',
-          color: widget.indicatorColor,
-        ),
       if (_canScrollDown)
         _TaskOverflowIndicator(
           key: const ValueKey('task-overflow-down'),
-          alignment: Alignment.bottomCenter,
           glyph: '▼',
           color: widget.indicatorColor,
         ),
@@ -854,26 +853,21 @@ class _TaskScrollViewState extends State<_TaskScrollView> {
 class _TaskOverflowIndicator extends StatelessWidget {
   const _TaskOverflowIndicator({
     super.key,
-    required this.alignment,
     required this.glyph,
     required this.color,
   });
 
-  final Alignment alignment;
   final String glyph;
   final Color color;
 
   @override
-  Widget build(BuildContext context) => Positioned.fill(
-    child: IgnorePointer(
-      child: Align(
-        alignment: alignment,
-        child: Semantics(
-          label: glyph == '▲' ? 'More tasks above' : 'More tasks below',
-          child: Text(
-            glyph,
-            style: TextStyle(color: color, fontWeight: FontWeight.bold),
-          ),
+  Widget build(BuildContext context) => IgnorePointer(
+    child: Center(
+      child: Semantics(
+        label: glyph == '▲' ? 'More tasks above' : 'More tasks below',
+        child: Text(
+          glyph,
+          style: TextStyle(color: color, fontWeight: FontWeight.bold),
         ),
       ),
     ),
@@ -903,7 +897,13 @@ class _KeepSelectedTaskVisibleState extends State<_KeepSelectedTaskVisible> {
   void didUpdateWidget(covariant _KeepSelectedTaskVisible oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selected && !oldWidget.selected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _reveal();
+        // Revealing a row can make the opposite overflow indicator appear,
+        // which changes the list viewport by one measured text line. Recheck
+        // after that layout so the newly selected row remains fully visible.
+        WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+      });
     }
   }
 

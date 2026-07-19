@@ -173,10 +173,55 @@ void main() {
           findsOneWidget,
         );
 
-        for (var index = 1; index < 20; index++) {
-          await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
-          await tester.pump();
+        void expectSelectionInsideViewport() {
+          final viewport = find.byKey(const ValueKey('task-list-viewport'));
+          final selectedTask = find.descendant(
+            of: viewport,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Semantics &&
+                  widget.properties.button == true &&
+                  widget.properties.selected == true,
+            ),
+          );
+          expect(selectedTask, findsOneWidget);
+          expect(
+            tester.getTopLeft(selectedTask).dy,
+            greaterThanOrEqualTo(tester.getTopLeft(viewport).dy),
+          );
+          expect(
+            tester.getBottomLeft(selectedTask).dy,
+            lessThanOrEqualTo(tester.getBottomLeft(viewport).dy),
+          );
         }
+
+        for (var index = 1; index < 19; index++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+          await tester.pumpAndSettle();
+          expectSelectionInsideViewport();
+        }
+        await tester.pump();
+
+        final secondLastTitle = scenario.name == 'completed'
+            ? 'Task 1'
+            : 'Task 18';
+        final secondLastTask = find.ancestor(
+          of: find.text(secondLastTitle),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Semantics && widget.properties.button == true,
+          ),
+        );
+        final downIndicator = find.byKey(const ValueKey('task-overflow-down'));
+        expect(secondLastTask, findsOneWidget);
+        expect(find.byKey(const ValueKey('task-overflow-up')), findsOneWidget);
+        expect(downIndicator, findsOneWidget);
+        expect(
+          tester.getBottomLeft(secondLastTask).dy,
+          lessThanOrEqualTo(tester.getTopLeft(downIndicator).dy),
+        );
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+        await tester.pump();
         await tester.pump();
 
         final lastTitle = scenario.name == 'completed' ? 'Task 0' : 'Task 19';
@@ -194,10 +239,33 @@ void main() {
         expect(find.byKey(const ValueKey('task-overflow-up')), findsOneWidget);
         expect(find.byKey(const ValueKey('task-overflow-down')), findsNothing);
 
-        for (var index = 1; index < 20; index++) {
+        for (var index = 1; index < 19; index++) {
           await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
           await tester.pump();
         }
+        await tester.pump();
+
+        final secondTitle = scenario.name == 'completed' ? 'Task 18' : 'Task 1';
+        final secondTask = find.ancestor(
+          of: find.text(secondTitle),
+          matching: find.byWidgetPredicate(
+            (widget) => widget is Semantics && widget.properties.button == true,
+          ),
+        );
+        final upIndicator = find.byKey(const ValueKey('task-overflow-up'));
+        expect(secondTask, findsOneWidget);
+        expect(upIndicator, findsOneWidget);
+        expect(
+          tester.getBottomLeft(upIndicator).dy,
+          lessThanOrEqualTo(tester.getTopLeft(secondTask).dy),
+        );
+        expect(
+          find.byKey(const ValueKey('task-overflow-down')),
+          findsOneWidget,
+        );
+
+        await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+        await tester.pump();
         await tester.pump();
 
         expect(find.byKey(const ValueKey('task-overflow-up')), findsNothing);
