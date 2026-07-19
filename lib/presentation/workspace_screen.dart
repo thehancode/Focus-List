@@ -1610,6 +1610,28 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                   settings.copyWith(nativeFontSize: value.round()),
                 ),
               ),
+              if (usesTerminalPresentation)
+                _TerminalLanguageControl(
+                  language: settings.language,
+                  onTap: () => vm.updateSettings(
+                    settings.copyWith(language: settings.language.next),
+                  ),
+                )
+              else
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(AppLocalizations.of(context)!.language),
+                  subtitle: Text(
+                    _languageLabel(
+                      settings.language,
+                      AppLocalizations.of(context)!,
+                    ),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => vm.updateSettings(
+                    settings.copyWith(language: settings.language.next),
+                  ),
+                ),
               const Divider(),
               Align(
                 alignment: Alignment.centerLeft,
@@ -1706,6 +1728,29 @@ class _TerminalToggle extends StatelessWidget {
   );
 }
 
+class _TerminalLanguageControl extends StatelessWidget {
+  const _TerminalLanguageControl({required this.language, required this.onTap});
+
+  final AppLanguage language;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
+    return Semantics(
+      button: true,
+      label: strings.languageValue(_languageLabel(language, strings)),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1),
+          child: Text(strings.languageValue(_languageLabel(language, strings))),
+        ),
+      ),
+    );
+  }
+}
+
 String _viewLabel(WorkspaceView view, AppLocalizations strings) =>
     switch (view) {
       WorkspaceView.list => strings.listView,
@@ -1719,6 +1764,12 @@ String _statusLabel(TaskStatus status, AppLocalizations strings) =>
       TaskStatus.pending => strings.pending,
       TaskStatus.doing => strings.doing,
       TaskStatus.done => strings.done,
+    };
+
+String _languageLabel(AppLanguage language, AppLocalizations strings) =>
+    switch (language) {
+      AppLanguage.english => strings.languageEnglish,
+      AppLanguage.spanish => strings.languageSpanish,
     };
 
 String _statusIcon(TaskStatus status) => switch (status) {

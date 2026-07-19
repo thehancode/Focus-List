@@ -35,6 +35,7 @@ void main() {
     'tag names have backward-compatible defaults and persist custom names',
     () {
       final defaults = AppSettings.fromJson(const {});
+      expect(defaults.language, AppLanguage.english);
       expect(defaults.tagNames.nameFor(TaskTag.spade), 'Spade');
       expect(defaults.tagNames.nameFor(TaskTag.heart), 'Heart');
 
@@ -49,6 +50,7 @@ void main() {
       settings.validate();
       expect(settings.tagNames.nameFor(TaskTag.diamond), 'Waiting');
       expect((settings.toJson()['tag_names']! as Map)['heart'], 'Important');
+      expect(settings.toJson()['language'], 'en');
     },
   );
 

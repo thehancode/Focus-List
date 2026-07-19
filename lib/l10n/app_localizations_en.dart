@@ -12,7 +12,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get appTitle => 'Focus List';
 
   @override
-  String get windowTitle => 'TUI Kanban';
+  String get windowTitle => 'Focus List';
 
   @override
   String get workspaceTitle => 'FOCUS LIST';
@@ -242,4 +242,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get saveTagNames => 'Save tag names';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String languageValue(Object language) {
+    return 'Language: $language';
+  }
+
+  @override
+  String get languageEnglish => 'English';
+
+  @override
+  String get languageSpanish => 'Spanish';
 }

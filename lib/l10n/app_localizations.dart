@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/intl.dart' as intl;
 
 import 'app_localizations_en.dart';
+import 'app_localizations_es.dart';
 
 // ignore_for_file: type=lint
 
@@ -92,249 +93,252 @@ abstract class AppLocalizations {
       ];
 
   /// A list of this localizations delegate's supported locales.
-  static const List<Locale> supportedLocales = <Locale>[Locale('en')];
+  static const List<Locale> supportedLocales = <Locale>[
+    Locale('en'),
+    Locale('es'),
+  ];
 
-  /// No description provided for @appTitle.
+  /// Application title used by Flutter.
   ///
   /// In en, this message translates to:
   /// **'Focus List'**
   String get appTitle;
 
-  /// No description provided for @windowTitle.
+  /// Reserved native window title.
   ///
   /// In en, this message translates to:
-  /// **'TUI Kanban'**
+  /// **'Focus List'**
   String get windowTitle;
 
-  /// No description provided for @workspaceTitle.
+  /// Brand label at the workspace header.
   ///
   /// In en, this message translates to:
   /// **'FOCUS LIST'**
   String get workspaceTitle;
 
-  /// No description provided for @cancel.
+  /// Button that dismisses an editor or confirmation.
   ///
   /// In en, this message translates to:
   /// **'Cancel'**
   String get cancel;
 
-  /// No description provided for @save.
+  /// Button that saves a task or list editor.
   ///
   /// In en, this message translates to:
   /// **'Save'**
   String get save;
 
-  /// No description provided for @delete.
+  /// Destructive confirmation or task-menu action.
   ///
   /// In en, this message translates to:
   /// **'Delete'**
   String get delete;
 
-  /// No description provided for @close.
+  /// Button that closes a dialog.
   ///
   /// In en, this message translates to:
   /// **'Close'**
   String get close;
 
-  /// No description provided for @task.
+  /// Compact Android floating action button label.
   ///
   /// In en, this message translates to:
   /// **'Task'**
   String get task;
 
-  /// No description provided for @newTask.
+  /// Action and dialog title for creating a task.
   ///
   /// In en, this message translates to:
   /// **'New task'**
   String get newTask;
 
-  /// No description provided for @editTask.
+  /// Task editor dialog title.
   ///
   /// In en, this message translates to:
   /// **'Edit task'**
   String get editTask;
 
-  /// No description provided for @duplicateTask.
+  /// Task duplication dialog title.
   ///
   /// In en, this message translates to:
   /// **'Duplicate task'**
   String get duplicateTask;
 
-  /// No description provided for @deleteTaskTitle.
+  /// Destructive task-deletion confirmation title.
   ///
   /// In en, this message translates to:
   /// **'Delete task?'**
   String get deleteTaskTitle;
 
-  /// No description provided for @deleteListTitle.
+  /// Destructive task-list deletion confirmation title.
   ///
   /// In en, this message translates to:
   /// **'Delete list?'**
   String get deleteListTitle;
 
-  /// No description provided for @deleteList.
+  /// Task-list menu action.
   ///
   /// In en, this message translates to:
   /// **'Delete list'**
   String get deleteList;
 
-  /// No description provided for @deleteTaskBody.
+  /// Warning in the task-deletion confirmation.
   ///
   /// In en, this message translates to:
   /// **'This cannot be undone.'**
   String get deleteTaskBody;
 
-  /// No description provided for @deleteListBody.
+  /// Delete-list confirmation; listName is user-created text.
   ///
   /// In en, this message translates to:
   /// **'Delete \"{listName}\" and all its tasks?'**
   String deleteListBody(Object listName);
 
-  /// No description provided for @keyboardShortcuts.
+  /// Title of the shortcut-reference dialog.
   ///
   /// In en, this message translates to:
   /// **'Keyboard shortcuts'**
   String get keyboardShortcuts;
 
-  /// No description provided for @keyboardShortcutsHelp.
+  /// Multiline desktop shortcut reference. Keep key glyphs and line breaks.
   ///
   /// In en, this message translates to:
   /// **'↑/↓ or J/K   Move selection\\nSpace then F   Advance status\\nSpace then ↑/↓   Reorder in status\\nN / E / D / X   New, edit, duplicate, delete task\\nT / Shift+T   Cycle first / second tag\\nTab / Shift+Tab   Switch task lists\\nCtrl+A   Multi view\\nCtrl+N   New list\\nF2 / Ctrl+R   Rename list\\nCtrl+X   Delete list\\nC   Doing focus\\nV   Completed history\\nG   Settings\\nS   Sound\\nQ   Quit'**
   String get keyboardShortcutsHelp;
 
-  /// No description provided for @couldNotLoad.
+  /// Fallback workspace loading error.
   ///
   /// In en, this message translates to:
   /// **'Could not load Focus List'**
   String get couldNotLoad;
 
-  /// No description provided for @dragWindow.
+  /// Accessibility label for Linux window drag area.
   ///
   /// In en, this message translates to:
   /// **'Drag window'**
   String get dragWindow;
 
-  /// No description provided for @newTaskTooltip.
+  /// Tooltip for the Android new-task icon.
   ///
   /// In en, this message translates to:
   /// **'New task (N)'**
   String get newTaskTooltip;
 
-  /// No description provided for @newListTooltip.
+  /// Tooltip for the Android new-list icon.
   ///
   /// In en, this message translates to:
   /// **'New list (Ctrl+N)'**
   String get newListTooltip;
 
-  /// No description provided for @listActions.
+  /// Tooltip for the task-list overflow menu.
   ///
   /// In en, this message translates to:
   /// **'List actions'**
   String get listActions;
 
-  /// No description provided for @appActions.
+  /// Tooltip for the application overflow menu.
   ///
   /// In en, this message translates to:
   /// **'App actions'**
   String get appActions;
 
-  /// No description provided for @newList.
+  /// Action and dialog title for creating a task list.
   ///
   /// In en, this message translates to:
   /// **'New list'**
   String get newList;
 
-  /// No description provided for @renameList.
+  /// Task-list menu action and editor title.
   ///
   /// In en, this message translates to:
   /// **'Rename list'**
   String get renameList;
 
-  /// No description provided for @toggleMultiView.
+  /// Menu action that opens or closes the multi-list view.
   ///
   /// In en, this message translates to:
   /// **'Toggle Multi view'**
   String get toggleMultiView;
 
-  /// No description provided for @settings.
+  /// Application settings menu action and dialog title.
   ///
   /// In en, this message translates to:
   /// **'Settings'**
   String get settings;
 
-  /// No description provided for @taskList.
+  /// Accessibility label for a task-list tab; listName is user content.
   ///
   /// In en, this message translates to:
   /// **'Task list {listName}'**
   String taskList(Object listName);
 
-  /// No description provided for @listView.
+  /// Uppercase header label for the normal task-list view.
   ///
   /// In en, this message translates to:
   /// **'LIST VIEW'**
   String get listView;
 
-  /// No description provided for @doingFocus.
+  /// Uppercase header label for the active-task view.
   ///
   /// In en, this message translates to:
   /// **'DOING FOCUS'**
   String get doingFocus;
 
-  /// No description provided for @completed.
+  /// Uppercase header label for completion history.
   ///
   /// In en, this message translates to:
   /// **'COMPLETED'**
   String get completed;
 
-  /// No description provided for @multiView.
+  /// Uppercase header label for the cross-list view.
   ///
   /// In en, this message translates to:
   /// **'MULTI VIEW'**
   String get multiView;
 
-  /// No description provided for @pending.
+  /// Task status label.
   ///
   /// In en, this message translates to:
   /// **'Pending'**
   String get pending;
 
-  /// No description provided for @doing.
+  /// Task status label for active work.
   ///
   /// In en, this message translates to:
   /// **'Doing'**
   String get doing;
 
-  /// No description provided for @done.
+  /// Task status label for completed work.
   ///
   /// In en, this message translates to:
   /// **'Done'**
   String get done;
 
-  /// No description provided for @noDoingTasks.
+  /// Empty state in the active-task view.
   ///
   /// In en, this message translates to:
   /// **'No doing tasks'**
   String get noDoingTasks;
 
-  /// No description provided for @noCompletedTasks.
+  /// Empty state in completion history; references a keyboard shortcut.
   ///
   /// In en, this message translates to:
   /// **'No completed tasks yet — finish one with Space, then F.'**
   String get noCompletedTasks;
 
-  /// No description provided for @noDoingOrPendingTasks.
+  /// Empty state in the multi-list view.
   ///
   /// In en, this message translates to:
   /// **'No Doing or Pending tasks'**
   String get noDoingOrPendingTasks;
 
-  /// No description provided for @empty.
+  /// Shown after a bullet in an empty task-status section.
   ///
   /// In en, this message translates to:
   /// **'empty'**
   String get empty;
 
-  /// No description provided for @taskSemantics.
+  /// Screen-reader label for a task row; title and tags are user content.
   ///
   /// In en, this message translates to:
   /// **'{status} task: {title}{tags}'**
@@ -346,185 +350,209 @@ abstract class AppLocalizations {
   /// **', tags: {tags}'**
   String taskTagsSemantics(Object tags);
 
-  /// No description provided for @advanceTask.
+  /// Tooltip for the button that advances a task status.
   ///
   /// In en, this message translates to:
   /// **'Advance task'**
   String get advanceTask;
 
-  /// No description provided for @taskActions.
+  /// Tooltip for the task overflow menu.
   ///
   /// In en, this message translates to:
   /// **'Task actions'**
   String get taskActions;
 
-  /// No description provided for @reopenInDoing.
+  /// Task menu action that moves a completed task to Doing.
   ///
   /// In en, this message translates to:
   /// **'Reopen in Doing'**
   String get reopenInDoing;
 
-  /// No description provided for @edit.
+  /// Short task menu action.
   ///
   /// In en, this message translates to:
   /// **'Edit'**
   String get edit;
 
-  /// No description provided for @duplicate.
+  /// Short task menu action.
   ///
   /// In en, this message translates to:
   /// **'Duplicate'**
   String get duplicate;
 
-  /// No description provided for @spaceArmed.
+  /// Terminal footer status after pressing Space; preserve surrounding spaces.
   ///
   /// In en, this message translates to:
   /// **' SPACE armed — F advance, ↑↓ reorder '**
   String get spaceArmed;
 
-  /// No description provided for @dailyActivity.
+  /// Terminal footer prefix before the daily-task completion glyphs.
   ///
   /// In en, this message translates to:
   /// **' Daily: {activity}'**
   String dailyActivity(Object activity);
 
-  /// No description provided for @keyboardHint.
+  /// Compact non-terminal footer shortcut reference.
   ///
   /// In en, this message translates to:
   /// **'Ctrl+A multi   Tab lists   ↑↓ move   N new   Space+F advance   Space+↑↓ sort   ? help'**
   String get keyboardHint;
 
-  /// No description provided for @commandSemantics.
+  /// Screen-reader label for a terminal command shortcut.
   ///
   /// In en, this message translates to:
   /// **'{label} command ({keys})'**
   String commandSemantics(Object label, Object keys);
 
-  /// No description provided for @commandMulti.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'multi'**
   String get commandMulti;
 
-  /// No description provided for @commandLists.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'lists'**
   String get commandLists;
 
-  /// No description provided for @commandMove.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'move'**
   String get commandMove;
 
-  /// No description provided for @commandNew.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'new'**
   String get commandNew;
 
-  /// No description provided for @commandAdvance.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'advance'**
   String get commandAdvance;
 
-  /// No description provided for @commandSort.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'sort'**
   String get commandSort;
 
-  /// No description provided for @commandTags.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'tags'**
   String get commandTags;
 
-  /// No description provided for @commandNewList.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'new list'**
   String get commandNewList;
 
-  /// No description provided for @commandRename.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'rename'**
   String get commandRename;
 
-  /// No description provided for @commandDeleteList.
+  /// Abbreviated terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'del list'**
   String get commandDeleteList;
 
-  /// No description provided for @commandSettings.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'settings'**
   String get commandSettings;
 
-  /// No description provided for @commandHelp.
+  /// Short terminal footer command label.
   ///
   /// In en, this message translates to:
   /// **'help'**
   String get commandHelp;
 
-  /// No description provided for @taskTitle.
+  /// Floating label for the task-title input.
   ///
   /// In en, this message translates to:
   /// **'Task title'**
   String get taskTitle;
 
-  /// No description provided for @dailyTask.
+  /// Toggle label marking a task as daily.
   ///
   /// In en, this message translates to:
   /// **'Daily task'**
   String get dailyTask;
 
-  /// No description provided for @listName.
+  /// Floating label for the task-list name input.
   ///
   /// In en, this message translates to:
   /// **'List name'**
   String get listName;
 
-  /// No description provided for @tagNamesCannotBeEmpty.
+  /// Validation error for custom task-tag names.
   ///
   /// In en, this message translates to:
   /// **'Tag names cannot be empty'**
   String get tagNamesCannotBeEmpty;
 
-  /// No description provided for @marqueeSpeed.
+  /// Settings label above the task-title scrolling speed slider.
   ///
   /// In en, this message translates to:
   /// **'Marquee speed: {milliseconds} ms'**
   String marqueeSpeed(int milliseconds);
 
-  /// No description provided for @wrapLongTitles.
+  /// Setting that wraps rather than scrolls long task titles.
   ///
   /// In en, this message translates to:
   /// **'Wrap long titles'**
   String get wrapLongTitles;
 
-  /// No description provided for @desktopFontSize.
+  /// Settings label above the terminal font-size slider.
   ///
   /// In en, this message translates to:
   /// **'Desktop font size: {points} pt'**
   String desktopFontSize(int points);
 
-  /// No description provided for @tagNames.
+  /// Heading for editable task-tag names.
   ///
   /// In en, this message translates to:
   /// **'Tag names'**
   String get tagNames;
 
-  /// No description provided for @saveTagNames.
+  /// Button that saves custom task-tag names.
   ///
   /// In en, this message translates to:
   /// **'Save tag names'**
   String get saveTagNames;
+
+  /// Settings row label for the application's display language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language'**
+  String get language;
+
+  /// Terminal settings control showing the selected display language.
+  ///
+  /// In en, this message translates to:
+  /// **'Language: {language}'**
+  String languageValue(Object language);
+
+  /// Name of the English display language.
+  ///
+  /// In en, this message translates to:
+  /// **'English'**
+  String get languageEnglish;
+
+  /// Name of the Spanish display language.
+  ///
+  /// In en, this message translates to:
+  /// **'Spanish'**
+  String get languageSpanish;
 }
 
 class _AppLocalizationsDelegate
@@ -538,7 +566,7 @@ class _AppLocalizationsDelegate
 
   @override
   bool isSupported(Locale locale) =>
-      <String>['en'].contains(locale.languageCode);
+      <String>['en', 'es'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
@@ -549,6 +577,8 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   switch (locale.languageCode) {
     case 'en':
       return AppLocalizationsEn();
+    case 'es':
+      return AppLocalizationsEs();
   }
 
   throw FlutterError(
