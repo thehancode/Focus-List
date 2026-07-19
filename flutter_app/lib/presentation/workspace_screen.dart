@@ -472,7 +472,7 @@ class _Tabs extends ConsumerWidget {
                     .read(workspaceViewModelProvider.notifier)
                     .selectList(list.id),
                 child: Container(
-                  alignment: Alignment.center,
+                  alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
                     vertical: 2,
@@ -480,6 +480,7 @@ class _Tabs extends ConsumerWidget {
                   color: selected ? _violet : _panel,
                   child: Text(
                     ' ${list.name} ',
+                    textAlign: TextAlign.left,
                     style: TextStyle(
                       color: selected ? const Color(0xff0d0f18) : _muted,
                       fontWeight: selected
@@ -501,13 +502,18 @@ class _Tabs extends ConsumerWidget {
     }
 
     if (usesTerminalPresentation) {
-      return SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            for (var index = 0; index < state.lists.length; index++)
-              item(index),
-          ],
+      return SizedBox(
+        width: double.infinity,
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.start,
+            children: [
+              for (var index = 0; index < state.lists.length; index++)
+                item(index),
+            ],
+          ),
         ),
       );
     }
