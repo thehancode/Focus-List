@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -607,9 +608,10 @@ class _TaskPanel extends ConsumerWidget {
       WorkspaceView.list => _violet,
       WorkspaceView.focus => _cyan,
       WorkspaceView.completed => _green,
-      WorkspaceView.multi => _amber,
+      WorkspaceView.multi => _violet,
     };
     return Container(
+      key: ValueKey('task-panel-${state.view.name}'),
       width: double.infinity,
       decoration: BoxDecoration(
         color: _panel,
@@ -628,7 +630,9 @@ class _ListContent extends StatelessWidget {
   final WorkspaceState state;
 
   @override
-  Widget build(BuildContext context) => ListView(
+  Widget build(BuildContext context) => _TaskScrollView(
+    key: const ValueKey('task-scroll-list'),
+    indicatorColor: _violet,
     padding: usesTerminalPresentation
         ? TerminalMetrics.panelPadding(context)
         : const EdgeInsets.all(12),
@@ -663,7 +667,9 @@ class _FocusContent extends StatelessWidget {
             .where((task) => task.status == TaskStatus.doing)
             .toList() ??
         const [];
-    return ListView(
+    return _TaskScrollView(
+      key: const ValueKey('task-scroll-focus'),
+      indicatorColor: _cyan,
       padding: usesTerminalPresentation
           ? TerminalMetrics.panelPadding(context)
           : const EdgeInsets.all(12),
@@ -686,19 +692,20 @@ class _CompletedContent extends StatelessWidget {
     if (entries.isEmpty) {
       return _EmptyState(AppLocalizations.of(context)!.noCompletedTasks);
     }
-    return ListView.builder(
+    return _TaskScrollView(
+      key: const ValueKey('task-scroll-completed'),
+      indicatorColor: _green,
       padding: usesTerminalPresentation
           ? TerminalMetrics.panelPadding(context)
           : const EdgeInsets.all(12),
-      itemCount: entries.length,
-      itemBuilder: (_, index) {
-        final entry = entries[index];
-        return _TaskRow(
-          task: entry.task,
-          state: state,
-          completedAt: entry.completedAt,
-        );
-      },
+      children: [
+        for (final entry in entries)
+          _TaskRow(
+            task: entry.task,
+            state: state,
+            completedAt: entry.completedAt,
+          ),
+      ],
     );
   }
 }
@@ -723,7 +730,7 @@ class _MultiContent extends StatelessWidget {
           ),
           child: Text(
             list.name.toUpperCase(),
-            style: const TextStyle(color: _amber, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: _violet, fontWeight: FontWeight.bold),
           ),
         ),
       );
@@ -743,13 +750,198 @@ class _MultiContent extends StatelessWidget {
     }
     return children.isEmpty
         ? _EmptyState(AppLocalizations.of(context)!.noDoingOrPendingTasks)
-        : ListView(
+        : _TaskScrollView(
+            key: const ValueKey('task-scroll-multi'),
+            indicatorColor: _violet,
             padding: usesTerminalPresentation
                 ? TerminalMetrics.panelPadding(context)
                 : const EdgeInsets.all(12),
             children: children,
           );
   }
+}
+
+class _TaskScrollView extends StatefulWidget {
+  const _TaskScrollView({
+    super.key,
+    required this.indicatorColor,
+    required this.padding,
+    required this.children,
+  });
+
+  final Color indicatorColor;
+  final EdgeInsetsGeometry padding;
+  final List<Widget> children;
+
+  @override
+  State<_TaskScrollView> createState() => _TaskScrollViewState();
+}
+
+class _TaskScrollViewState extends State<_TaskScrollView> {
+  final _controller = ScrollController();
+  bool _canScrollUp = false;
+  bool _canScrollDown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_updateIndicators);
+    _scheduleIndicatorUpdate();
+  }
+
+  @override
+  void didUpdateWidget(covariant _TaskScrollView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _scheduleIndicatorUpdate();
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_updateIndicators)
+      ..dispose();
+    super.dispose();
+  }
+
+  void _scheduleIndicatorUpdate() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _updateIndicators();
+    });
+  }
+
+  void _updateIndicators() {
+    if (!_controller.hasClients) return;
+    final position = _controller.position;
+    final canScrollUp = position.extentBefore > 0.5;
+    final canScrollDown = position.extentAfter > 0.5;
+    if (canScrollUp == _canScrollUp && canScrollDown == _canScrollDown) {
+      return;
+    }
+    setState(() {
+      _canScrollUp = canScrollUp;
+      _canScrollDown = canScrollDown;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    children: [
+      Positioned.fill(
+        child: ListView(
+          controller: _controller,
+          padding: widget.padding,
+          children: widget.children,
+        ),
+      ),
+      if (_canScrollUp)
+        _TaskOverflowIndicator(
+          key: const ValueKey('task-overflow-up'),
+          alignment: Alignment.topCenter,
+          glyph: '▲',
+          color: widget.indicatorColor,
+        ),
+      if (_canScrollDown)
+        _TaskOverflowIndicator(
+          key: const ValueKey('task-overflow-down'),
+          alignment: Alignment.bottomCenter,
+          glyph: '▼',
+          color: widget.indicatorColor,
+        ),
+    ],
+  );
+}
+
+class _TaskOverflowIndicator extends StatelessWidget {
+  const _TaskOverflowIndicator({
+    super.key,
+    required this.alignment,
+    required this.glyph,
+    required this.color,
+  });
+
+  final Alignment alignment;
+  final String glyph;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Positioned.fill(
+    child: IgnorePointer(
+      child: Align(
+        alignment: alignment,
+        child: Semantics(
+          label: glyph == '▲' ? 'More tasks above' : 'More tasks below',
+          child: Text(
+            glyph,
+            style: TextStyle(color: color, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _KeepSelectedTaskVisible extends StatefulWidget {
+  const _KeepSelectedTaskVisible({
+    required this.selected,
+    required this.first,
+    required this.last,
+    required this.child,
+  });
+
+  final bool selected;
+  final bool first;
+  final bool last;
+  final Widget child;
+
+  @override
+  State<_KeepSelectedTaskVisible> createState() =>
+      _KeepSelectedTaskVisibleState();
+}
+
+class _KeepSelectedTaskVisibleState extends State<_KeepSelectedTaskVisible> {
+  @override
+  void didUpdateWidget(covariant _KeepSelectedTaskVisible oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selected && !oldWidget.selected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    }
+  }
+
+  void _reveal() {
+    if (!mounted) return;
+    final scrollable = Scrollable.maybeOf(context);
+    final target = context.findRenderObject();
+    if (scrollable == null || target == null || !target.attached) return;
+    final position = scrollable.position;
+    final viewport = RenderAbstractViewport.maybeOf(target);
+    if (!position.hasPixels || viewport == null) return;
+
+    if (widget.first) {
+      position.jumpTo(position.minScrollExtent);
+      return;
+    }
+    if (widget.last) {
+      position.jumpTo(position.maxScrollExtent);
+      return;
+    }
+
+    final leading = viewport.getOffsetToReveal(target, 0).offset;
+    final trailing = viewport.getOffsetToReveal(target, 1).offset;
+    double? offset;
+    if (leading < position.pixels) {
+      offset = leading;
+    } else if (trailing > position.pixels) {
+      offset = trailing;
+    }
+    if (offset != null) {
+      position.jumpTo(
+        offset.clamp(position.minScrollExtent, position.maxScrollExtent),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 class _TaskSection extends StatelessWidget {
@@ -810,6 +1002,7 @@ class _TaskRow extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final terminal = usesTerminalPresentation;
     final selected = task.id == state.selectedTaskId;
+    final visibleTaskIds = selected ? state.visibleTaskIds : const <String>[];
     final done = task.status == TaskStatus.done;
     final animated = task.id == state.animatedTaskId;
     final title = _TaskTitle(
@@ -955,10 +1148,16 @@ class _TaskRow extends ConsumerWidget {
         ),
       ),
     );
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return _AndroidTagSwipe(taskId: task.id, child: row);
-    }
-    return row;
+    final interactiveRow =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+        ? _AndroidTagSwipe(taskId: task.id, child: row)
+        : row;
+    return _KeepSelectedTaskVisible(
+      selected: selected,
+      first: visibleTaskIds.isNotEmpty && visibleTaskIds.first == task.id,
+      last: visibleTaskIds.isNotEmpty && visibleTaskIds.last == task.id,
+      child: interactiveRow,
+    );
   }
 }
 

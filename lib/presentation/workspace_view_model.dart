@@ -480,7 +480,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     if (list == null) return false;
     final task = _newTask(title, daily);
     return _saveList(
-      list.copyWith(tasks: [...list.tasks, task]),
+      list.copyWith(tasks: [task, ...list.tasks]),
       success: 'Task added',
       selectedTaskId: task.id,
     );

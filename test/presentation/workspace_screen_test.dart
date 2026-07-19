@@ -77,6 +77,140 @@ void main() {
     },
   );
 
+  testWidgets('terminal multi view uses violet list names and panel border', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final list = _listWithTask();
+    final secondList = TaskList(
+      schemaVersion: currentSchemaVersion,
+      id: 'list-2',
+      name: 'Work',
+      createdAt: list.createdAt,
+      tasks: list.tasks,
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([list, secondList]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    for (final name in ['TASKS', 'WORK']) {
+      final label = find.text(name);
+      expect(label, findsOneWidget);
+      expect(tester.widget<Text>(label).style?.color, terminalViolet);
+    }
+    final panel = tester.widget<Container>(
+      find.byKey(const ValueKey('task-panel-multi')),
+    );
+    final decoration = panel.decoration! as BoxDecoration;
+    expect(decoration.border, Border.all(color: terminalViolet));
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  for (final scenario in [
+    (name: 'list', status: TaskStatus.pending),
+    (name: 'focus', status: TaskStatus.doing),
+    (name: 'completed', status: TaskStatus.done),
+    (name: 'multi', status: TaskStatus.pending),
+  ]) {
+    testWidgets(
+      'keyboard selection scrolls through overflowing ${scenario.name} view',
+      (tester) async {
+        debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+        addTearDown(() => debugDefaultTargetPlatformOverride = null);
+        await tester.binding.setSurfaceSize(const Size(420, 300));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              taskListRepositoryProvider.overrideWithValue(
+                _Lists(
+                  _listsWithManyTasks(
+                    scenario.status,
+                    multipleLists: scenario.name == 'multi',
+                  ),
+                ),
+              ),
+              settingsRepositoryProvider.overrideWithValue(const _Settings()),
+            ],
+            child: const FocusListApp(),
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 20));
+
+        if (scenario.name == 'focus') {
+          await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+        } else if (scenario.name == 'completed') {
+          await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+        } else if (scenario.name == 'multi') {
+          await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+          await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+          await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        }
+        await tester.pump();
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('task-overflow-up')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('task-overflow-down')),
+          findsOneWidget,
+        );
+
+        for (var index = 1; index < 20; index++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+          await tester.pump();
+        }
+        await tester.pump();
+
+        final lastTitle = scenario.name == 'completed' ? 'Task 0' : 'Task 19';
+        final lastTask = find.text(lastTitle);
+        final panel = find.byKey(ValueKey('task-panel-${scenario.name}'));
+        expect(lastTask, findsOneWidget);
+        expect(
+          tester.getTopLeft(lastTask).dy,
+          greaterThan(tester.getTopLeft(panel).dy),
+        );
+        expect(
+          tester.getBottomLeft(lastTask).dy,
+          lessThan(tester.getBottomLeft(panel).dy),
+        );
+        expect(find.byKey(const ValueKey('task-overflow-up')), findsOneWidget);
+        expect(find.byKey(const ValueKey('task-overflow-down')), findsNothing);
+
+        for (var index = 1; index < 20; index++) {
+          await tester.sendKeyEvent(LogicalKeyboardKey.arrowUp);
+          await tester.pump();
+        }
+        await tester.pump();
+
+        expect(find.byKey(const ValueKey('task-overflow-up')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('task-overflow-down')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        debugDefaultTargetPlatformOverride = null;
+      },
+    );
+  }
+
   testWidgets('terminal dialog titles use the workspace text height', (
     tester,
   ) async {
@@ -359,6 +493,40 @@ TaskList _listWithTask({List<TaskTag> tags = const []}) {
       ),
     ],
   );
+}
+
+List<TaskList> _listsWithManyTasks(
+  TaskStatus status, {
+  required bool multipleLists,
+}) {
+  final now = DateTime.utc(2026, 1, 1);
+  Task task(int index) => Task(
+    id: 'task-$index',
+    title: 'Task $index',
+    status: status,
+    createdAt: now,
+    updatedAt: now,
+    completedAt: status == TaskStatus.done
+        ? now.add(Duration(minutes: index))
+        : null,
+    daily: false,
+    completionHistory: const [],
+  );
+  TaskList list(String id, String name, Iterable<int> indexes) => TaskList(
+    schemaVersion: currentSchemaVersion,
+    id: id,
+    name: name,
+    createdAt: now,
+    tasks: indexes.map(task).toList(),
+  );
+
+  if (multipleLists) {
+    return [
+      list('list-1', 'Tasks', Iterable<int>.generate(10)),
+      list('list-2', 'Work', Iterable<int>.generate(10, (index) => index + 10)),
+    ];
+  }
+  return [list('list-1', 'Tasks', Iterable<int>.generate(20))];
 }
 
 class _Lists implements TaskListRepository {

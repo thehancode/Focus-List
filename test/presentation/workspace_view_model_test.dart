@@ -66,6 +66,32 @@ void main() {
     },
   );
 
+  test(
+    'new tasks are added at the top of the pending list and persist',
+    () async {
+      final list = _list('tasks', 'Tasks', [
+        _task('pending', 'Existing pending'),
+        _task('doing', 'Existing doing', status: TaskStatus.doing),
+      ]);
+      final repository = _TaskLists([list]);
+      final container = _container([list], repository: repository);
+      addTearDown(container.dispose);
+      final vm = await _ready(container);
+
+      await vm.createTask('New pending', false);
+
+      final saved = repository.lists.single;
+      expect(saved.tasks.first.title, 'New pending');
+      expect(
+        saved.tasks
+            .where((task) => task.status == TaskStatus.pending)
+            .first
+            .title,
+        'New pending',
+      );
+    },
+  );
+
   test('tag slots cycle, skip duplicates, compact, and persist', () async {
     final list = _list('tasks', 'Tasks', [_task('first', 'First')]);
     final repository = _TaskLists([list]);
