@@ -29,8 +29,8 @@ TextStyle? _dialogInputStyle(BuildContext context) =>
 
 Color _tagColor(TaskTag tag) => switch (tag) {
   TaskTag.spade => _violet,
-  TaskTag.heart => _red,
-  TaskTag.club => _green,
+  TaskTag.heart => _green,
+  TaskTag.club => _red,
   TaskTag.diamond => _amber,
 };
 
@@ -848,6 +848,8 @@ class _TaskRow extends ConsumerWidget {
                 : BorderRadius.circular(5),
             border: null,
           ),
+          // The selected row supplies the violet background across its full
+          // measured height, including the tag columns.
           child: Row(
             children: [
               Text(
@@ -858,11 +860,7 @@ class _TaskRow extends ConsumerWidget {
                 ),
               ),
               Expanded(child: title),
-              _TaskTags(
-                task: task,
-                settings: state.settings,
-                selected: selected,
-              ),
+              _TaskTags(task: task, selected: selected),
               if (task.daily)
                 terminal
                     ? Text(
@@ -941,39 +939,36 @@ class _TaskRow extends ConsumerWidget {
 }
 
 class _TaskTags extends StatelessWidget {
-  const _TaskTags({
-    required this.task,
-    required this.settings,
-    required this.selected,
-  });
+  const _TaskTags({required this.task, required this.selected});
   final Task task;
-  final AppSettings settings;
   final bool selected;
 
   @override
   Widget build(BuildContext context) {
+    final terminal = usesTerminalPresentation;
     final cell = TerminalMetrics.cell(context);
     final cells = task.tags.length < 2 ? 2 : task.tags.length;
     return SizedBox(
       key: ValueKey('task-tags-${task.id}'),
       width: cell * cells,
       child: ColoredBox(
-        color: selected && task.tags.isNotEmpty
-            ? terminalBackground
+        color: terminal && selected && task.tags.isNotEmpty
+            ? _violet
             : Colors.transparent,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             for (final tag in task.tags)
-              Tooltip(
-                message: settings.tagNames.nameFor(tag),
-                child: SizedBox(
-                  width: cell,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      tag.glyph,
-                      style: TextStyle(color: _tagColor(tag)),
+              SizedBox(
+                width: cell,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    tag.glyph,
+                    style: TextStyle(
+                      color: terminal && selected
+                          ? terminalBackground
+                          : _tagColor(tag),
                     ),
                   ),
                 ),

@@ -13,10 +13,10 @@ extension TaskTagX on TaskTag {
   String get wireName => name;
 
   String get glyph => switch (this) {
-    TaskTag.spade => '♠',
-    TaskTag.heart => '♥',
-    TaskTag.club => '♣',
-    TaskTag.diamond => '♦',
+    TaskTag.spade => '●',
+    TaskTag.heart => '▲',
+    TaskTag.club => '◆',
+    TaskTag.diamond => '■',
   };
 
   static TaskTag fromWireName(Object? value) => switch (value) {

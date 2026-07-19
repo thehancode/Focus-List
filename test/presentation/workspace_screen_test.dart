@@ -172,7 +172,7 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('T and Shift+T cycle two colored terminal tags', (tester) async {
+  testWidgets('T and Shift+T cycle selected terminal tags', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     await tester.binding.setSurfaceSize(const Size(700, 500));
@@ -192,19 +192,25 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.pump();
-    expect(find.text('♠'), findsOneWidget);
-    expect(tester.widget<Text>(find.text('♠')).style?.color, terminalViolet);
+    expect(find.text('●'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('●')).style?.color,
+      terminalBackground,
+    );
     await tester.sendKeyRepeatEvent(LogicalKeyboardKey.keyT);
     await tester.pump();
-    expect(find.text('♠'), findsOneWidget);
-    expect(find.text('♥'), findsNothing);
+    expect(find.text('●'), findsOneWidget);
+    expect(find.text('▲'), findsNothing);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
     await tester.pump();
-    expect(find.text('♥'), findsOneWidget);
-    expect(tester.widget<Text>(find.text('♥')).style?.color, terminalRed);
+    expect(find.text('▲'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.text('▲')).style?.color,
+      terminalBackground,
+    );
     expect(
       tester.getSize(find.byKey(const ValueKey('task-tags-task-1'))).width,
       closeTo(
@@ -215,6 +221,51 @@ void main() {
         .01,
       ),
     );
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('selected terminal tags fill the wrapped task row', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final taggedTask = _listWithTask(
+      tags: const [TaskTag.heart],
+    ).tasks.single.copyWith(title: 'A selected task\nwith a second line');
+    final list = _listWithTask(
+      tags: const [TaskTag.heart],
+    ).copyWith(tasks: [taggedTask]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(
+            _Settings(
+              const AppSettings(
+                nativeFontSize: 28,
+                longTitleDisplay: LongTitleDisplay.wrap,
+              ),
+            ),
+          ),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final tags = find.byKey(const ValueKey('task-tags-task-1'));
+    final tagBackground = find.descendant(
+      of: tags,
+      matching: find.byType(ColoredBox),
+    );
+    expect(tester.widget<ColoredBox>(tagBackground).color, terminalViolet);
+    expect(
+      tester.widget<Text>(find.text('▲')).style?.color,
+      terminalBackground,
+    );
+    expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
 
@@ -242,12 +293,12 @@ void main() {
     await tester.drag(task, const Offset(-100, 0));
     await tester.pumpAndSettle();
     expect(task, findsOneWidget);
-    expect(find.text('♠'), findsOneWidget);
+    expect(find.text('●'), findsOneWidget);
 
     await tester.drag(task, const Offset(100, 0));
     await tester.pumpAndSettle();
     expect(task, findsOneWidget);
-    expect(find.text('♥'), findsOneWidget);
+    expect(find.text('▲'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 
