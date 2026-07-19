@@ -33,6 +33,13 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local development tooling and legacy Rust artifacts
+/.tooling/
+/target/
+/tasklists/
+/PROMPTS.md
+/instructions.txt
+
 # Symbolication related
 app.*.symbols
 
