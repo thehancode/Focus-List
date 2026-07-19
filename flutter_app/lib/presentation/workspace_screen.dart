@@ -17,6 +17,14 @@ const _cyan = terminalCyan;
 const _green = terminalGreen;
 const _red = terminalRed;
 
+EdgeInsetsGeometry? get _dialogTitlePadding =>
+    usesTerminalPresentation ? const EdgeInsets.fromLTRB(10, 8, 10, 0) : null;
+EdgeInsetsGeometry? get _dialogContentPadding =>
+    usesTerminalPresentation ? const EdgeInsets.fromLTRB(10, 8, 10, 8) : null;
+
+TextStyle? _dialogInputStyle(BuildContext context) =>
+    usesTerminalPresentation ? Theme.of(context).textTheme.bodyMedium : null;
+
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key});
 
@@ -237,6 +245,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       await showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
+          titlePadding: _dialogTitlePadding,
+          contentPadding: _dialogContentPadding,
           title: Text(title, style: const TextStyle(color: _red)),
           content: Text(content),
           actions: [
@@ -265,6 +275,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
   Future<void> _showHelp() => showDialog<void>(
     context: context,
     builder: (_) => AlertDialog(
+      titlePadding: _dialogTitlePadding,
+      contentPadding: _dialogContentPadding,
       title: const Text('Keyboard shortcuts'),
       content: const SingleChildScrollView(
         child: Text(
@@ -388,11 +400,11 @@ class _Header extends ConsumerWidget {
             color: terminal ? _violet : Colors.transparent,
             padding: EdgeInsets.symmetric(
               horizontal: terminal ? 8 : 0,
-              vertical: terminal ? 2 : 0,
+              vertical: terminal ? 1 : 0,
             ),
             alignment: Alignment.center,
             child: Text(
-              terminal ? ' FOCUS LIST ' : 'FOCUS LIST',
+              'FOCUS LIST',
               style: TextStyle(
                 color: terminal ? terminalBackground : _violet,
                 fontWeight: FontWeight.bold,
@@ -475,11 +487,11 @@ class _Tabs extends ConsumerWidget {
                   alignment: Alignment.centerLeft,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 8,
-                    vertical: 2,
+                    vertical: 1,
                   ),
                   color: selected ? _violet : _panel,
                   child: Text(
-                    ' ${list.name} ',
+                    list.name,
                     textAlign: TextAlign.left,
                     style: TextStyle(
                       color: selected ? const Color(0xff0d0f18) : _muted,
@@ -779,7 +791,7 @@ class _TaskRow extends ConsumerWidget {
           margin: EdgeInsets.symmetric(vertical: terminal ? 0 : 2),
           padding: EdgeInsets.symmetric(
             horizontal: terminal ? 0 : 8,
-            vertical: terminal ? 2 : 9,
+            vertical: terminal ? 1 : 9,
           ),
           decoration: BoxDecoration(
             color: animated
@@ -1049,7 +1061,7 @@ class _Footer extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(vertical: 2),
+          padding: const EdgeInsets.symmetric(vertical: 1),
           child: activity,
         ),
         SingleChildScrollView(
@@ -1111,24 +1123,20 @@ class _TerminalCommand extends StatelessWidget {
     child: InkWell(
       onTap: onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
-        child: Text.rich(
-          TextSpan(
-            children: [
-              TextSpan(
-                text: ' $keys ',
-                style: const TextStyle(
-                  color: _violet,
-                  fontWeight: FontWeight.bold,
-                ),
+        padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              keys,
+              style: const TextStyle(
+                color: _violet,
+                fontWeight: FontWeight.bold,
               ),
-              TextSpan(
-                text: '$label  ',
-                style: const TextStyle(color: _muted),
-              ),
-            ],
-          ),
-          maxLines: 1,
+            ),
+            SizedBox(width: TerminalMetrics.cell(context)),
+            Text(label, style: const TextStyle(color: _muted)),
+          ],
         ),
       ),
     ),
@@ -1197,6 +1205,8 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
         ),
       },
       child: AlertDialog(
+        titlePadding: _dialogTitlePadding,
+        contentPadding: _dialogContentPadding,
         title: Text(widget.title),
         content: SizedBox(
           width: 460,
@@ -1206,6 +1216,11 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
               TextField(
                 controller: _controller,
                 autofocus: true,
+                style: _dialogInputStyle(context),
+                cursorHeight: usesTerminalPresentation
+                    ? TerminalMetrics.renderedFontSize(context)
+                    : null,
+                cursorWidth: usesTerminalPresentation ? 1 : 2,
                 maxLines: 3,
                 minLines: 1,
                 decoration: const InputDecoration(labelText: 'Task title'),
@@ -1259,12 +1274,19 @@ class _ListEditorDialogState extends State<_ListEditorDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
+    titlePadding: _dialogTitlePadding,
+    contentPadding: _dialogContentPadding,
     title: Text(widget.rename ? 'Rename list' : 'New list'),
     content: SizedBox(
       width: 380,
       child: TextField(
         controller: _controller,
         autofocus: true,
+        style: _dialogInputStyle(context),
+        cursorHeight: usesTerminalPresentation
+            ? TerminalMetrics.renderedFontSize(context)
+            : null,
+        cursorWidth: usesTerminalPresentation ? 1 : 2,
         onSubmitted: (_) => _save(),
         decoration: const InputDecoration(labelText: 'List name'),
       ),
@@ -1286,6 +1308,8 @@ class _SettingsDialog extends ConsumerWidget {
     final settings = ref.watch(workspaceViewModelProvider).settings;
     final vm = ref.read(workspaceViewModelProvider.notifier);
     return AlertDialog(
+      titlePadding: _dialogTitlePadding,
+      contentPadding: _dialogContentPadding,
       title: const Text('Settings'),
       content: SizedBox(
         width: 420,
@@ -1434,6 +1458,8 @@ Future<void> _handleTaskAction(
         await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
+            titlePadding: _dialogTitlePadding,
+            contentPadding: _dialogContentPadding,
             title: const Text('Delete task?', style: TextStyle(color: _red)),
             content: const Text('This cannot be undone.'),
             actions: [

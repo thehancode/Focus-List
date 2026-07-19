@@ -69,6 +69,47 @@ void main() {
     },
   );
 
+  testWidgets('terminal dialog titles use the workspace text height', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(_Lists()),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+    await tester.tap(find.bySemanticsLabel(RegExp('new command')));
+    await tester.pumpAndSettle();
+
+    final title = find.text('New task');
+    final body = find.text('Daily task');
+    expect(title, findsOneWidget);
+    expect(body, findsOneWidget);
+    expect(tester.getSize(title).height, tester.getSize(body).height);
+    final editable = tester.widget<EditableText>(find.byType(EditableText));
+    final terminalBody = Theme.of(
+      tester.element(find.byType(EditableText)),
+    ).textTheme.bodyMedium!;
+    expect(editable.style.fontSize, terminalBody.fontSize);
+    expect(editable.style.height, 1);
+    final floatingLabel = find.text('Task title');
+    expect(floatingLabel, findsOneWidget);
+    expect(
+      tester.getBottomLeft(floatingLabel).dy,
+      lessThanOrEqualTo(tester.getTopLeft(find.byType(EditableText)).dy),
+    );
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('terminal rows grow with the configured font size', (
     tester,
   ) async {
@@ -79,7 +120,7 @@ void main() {
     final now = DateTime.utc(2026, 1, 1);
     final task = Task(
       id: 'task-1',
-      title: 'Large terminal text',
+      title: 'Large terminal text\non a second line',
       status: TaskStatus.pending,
       createdAt: now,
       updatedAt: now,
@@ -99,7 +140,12 @@ void main() {
         overrides: [
           taskListRepositoryProvider.overrideWithValue(_Lists([list])),
           settingsRepositoryProvider.overrideWithValue(
-            _Settings(const AppSettings(nativeFontSize: 28)),
+            _Settings(
+              const AppSettings(
+                nativeFontSize: 28,
+                longTitleDisplay: LongTitleDisplay.wrap,
+              ),
+            ),
           ),
         ],
         child: const FocusListApp(),
@@ -108,8 +154,12 @@ void main() {
     await tester.pump(const Duration(milliseconds: 20));
 
     final taskRow = find.bySemanticsLabel(RegExp('Pending task'));
+    final taskText = find.text('Large terminal text\non a second line');
     expect(taskRow, findsOneWidget);
-    expect(tester.getSize(taskRow).height, greaterThan(36));
+    expect(taskText, findsOneWidget);
+    // bodyMedium is 14 px, scaled by 28 / 16 to 24.5 px. A normalized
+    // two-line terminal paragraph should therefore occupy about 49 px.
+    expect(tester.getSize(taskText).height, inInclusiveRange(49, 51));
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });

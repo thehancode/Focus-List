@@ -17,9 +17,12 @@ abstract final class TerminalMetrics {
   static double fontSize(BuildContext context) =>
       Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14;
 
+  static double renderedFontSize(BuildContext context) =>
+      MediaQuery.textScalerOf(context).scale(fontSize(context));
+
   /// Ubuntu Mono is approximately 0.61 em wide.
   static double cell(BuildContext context) =>
-      (fontSize(context) * .61).clamp(6, double.infinity);
+      (renderedFontSize(context) * .61).clamp(6, double.infinity);
 
   /// Measure the font's real line box instead of approximating it from points.
   static double line(BuildContext context) {
@@ -37,6 +40,6 @@ abstract final class TerminalMetrics {
 
   static EdgeInsets panelPadding(BuildContext context) => EdgeInsets.symmetric(
     horizontal: cell(context),
-    vertical: line(context) * .16,
+    vertical: line(context) * .1,
   );
 }
