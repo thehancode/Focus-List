@@ -1,17 +1,37 @@
-# flutter_app
+# Focus List Flutter
 
-A new Flutter project.
+Local-first Flutter migration of the Rust Focus List application. It currently
+targets Linux desktop, web, and Android from one codebase.
 
-## Getting Started
+## Run
 
-This project is a starting point for a Flutter application.
+```sh
+flutter pub get
+flutter run -d linux
+flutter run -d chrome
+flutter run -d android
+```
 
-A few resources to get you started if this is your first Flutter project:
+## Local data
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Linux deliberately uses the existing Rust location:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```text
+$XDG_DATA_HOME/tui-kanban/tasklists/
+# or ~/.local/share/tui-kanban/tasklists/
+```
+
+Android uses private application-support storage. Web uses browser IndexedDB.
+All three persist one schema-version-1 JSON-compatible task-list document per
+list. Do not run the Rust application and the Flutter Linux application at the
+same time: they use the same files and do not coordinate writes.
+
+## Architecture
+
+`lib/domain` contains immutable models and repository contracts.
+`lib/data` contains JSON/local-store implementations. `lib/presentation`
+contains Riverpod MVVM workspace state and widgets. Widgets do not access files
+or IndexedDB directly.
+
+The migration behavior contract and phased design live in
+`../flutter-migration/`.

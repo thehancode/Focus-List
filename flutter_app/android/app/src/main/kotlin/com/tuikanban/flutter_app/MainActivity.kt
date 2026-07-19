@@ -1,4 +1,4 @@
-package com.tuikanban.flutter_app
+package com.tuikanban.focus_list
 
 import io.flutter.embedding.android.FlutterActivity
 
