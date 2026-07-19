@@ -35,12 +35,26 @@ Future<void> main() async {
     );
     await windowManager.waitUntilReadyToShow(options, () async {
       await windowManager.show();
+      // Request activation while this launch still has the desktop's startup
+      // focus token. Waiting until after position restoration can allow the
+      // previously active application to remain above this window.
+      await windowManager.focus();
       if (savedBounds != null) {
-        // GTK/X11 window managers may ignore placement requests made before
-        // the native window is mapped. Restore after showing it instead.
+        // The Linux plugin moves before resizing when setBounds is called.
+        // Apply the bounds once now, then move again after GTK and the window
+        // manager have processed the initial map/resize cycle.
         await windowManager.setBounds(savedBounds);
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        await windowManager.setPosition(savedBounds.topLeft);
+      } else {
+        // Do not let the compositor's initial centered placement become the
+        // user's persisted position before they have moved the window.
+        await Future<void>.delayed(const Duration(milliseconds: 150));
       }
+      // Startup move/resize events have drained before persistence begins, so
+      // only the restored position or later user changes can be saved.
       positionPersistence.start();
+      // Moving can change stacking on some X11 window managers.
       await windowManager.focus();
     });
   }

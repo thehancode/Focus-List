@@ -50,7 +50,10 @@ class _DesktopWindowPositionPersistence
     if (!_isSupported || _listening) return;
     _listening = true;
     windowManager.addListener(this);
-    _captureBounds();
+    // Do not sample immediately: GTK may still report the initial compositor
+    // placement while a restored move is being processed. Move/resize events
+    // capture the stable bounds without replacing a valid saved position with
+    // the transient startup position.
   }
 
   @override
