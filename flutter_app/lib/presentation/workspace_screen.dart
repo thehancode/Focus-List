@@ -6,16 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../app/ui_mode.dart';
 import '../domain/models.dart';
-import 'terminal_grid.dart';
+import 'terminal_style.dart';
 import 'workspace_view_model.dart';
 
-const _panel = Color(0xff161926);
-const _muted = Color(0xff767c94);
-const _violet = Color(0xffb794f4);
-const _amber = Color(0xfff9bf60);
-const _cyan = Color(0xff5dd3dc);
-const _green = Color(0xff7dcf91);
-const _red = Color(0xfff4707a);
+const _panel = terminalPanel;
+const _muted = terminalMuted;
+const _violet = terminalViolet;
+const _amber = terminalAmber;
+const _cyan = terminalCyan;
+const _green = terminalGreen;
+const _red = terminalRed;
 
 class WorkspaceScreen extends ConsumerStatefulWidget {
   const WorkspaceScreen({super.key});
@@ -303,7 +303,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     }
     final workspace = SafeArea(
       child: Padding(
-        padding: EdgeInsets.all(terminal ? 10 : 12),
+        padding: EdgeInsets.all(terminal ? 0 : 12),
         child: Column(
           children: [
             _Header(
@@ -315,12 +315,28 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
               onSettings: _showSettings,
               onHelp: _showHelp,
             ),
-            SizedBox(height: terminal ? 6 : 8),
+            SizedBox(height: terminal ? 0 : 8),
             _Tabs(state: state),
-            SizedBox(height: terminal ? 6 : 10),
-            Expanded(child: _TaskPanel(state: state)),
-            SizedBox(height: terminal ? 6 : 8),
-            _Footer(state: state, grabbed: _grabbed),
+            Expanded(
+              child: Padding(
+                padding: terminal
+                    ? const EdgeInsets.symmetric(
+                        horizontal: TerminalMetrics.cell,
+                      )
+                    : const EdgeInsets.only(top: 10, bottom: 8),
+                child: _TaskPanel(state: state),
+              ),
+            ),
+            _Footer(
+              state: state,
+              grabbed: _grabbed,
+              onNewTask: _showTaskEditor,
+              onCreateList: _showListEditor,
+              onRenameList: () => _showListEditor(rename: true),
+              onDeleteList: _confirmDeleteList,
+              onSettings: _showSettings,
+              onHelp: _showHelp,
+            ),
           ],
         ),
       ),
@@ -330,19 +346,15 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       autofocus: true,
       onKeyEvent: _onKey,
       child: Scaffold(
-        floatingActionButton: MediaQuery.sizeOf(context).width < 720
+        floatingActionButton:
+            !terminal && MediaQuery.sizeOf(context).width < 720
             ? FloatingActionButton.extended(
                 onPressed: _showTaskEditor,
                 icon: const Icon(Icons.add),
                 label: const Text('Task'),
               )
             : null,
-        body: terminal
-            ? TerminalGrid(
-                fontSize: state.settings.nativeFontSize.toDouble(),
-                child: workspace,
-              )
-            : workspace,
+        body: workspace,
       ),
     );
   }
@@ -367,60 +379,75 @@ class _Header extends ConsumerWidget {
   final VoidCallback onHelp;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Row(
-    children: [
-      Text(
-        usesTerminalPresentation ? '[ FOCUS LIST ]' : 'FOCUS LIST',
-        style: TextStyle(
-          color: _violet,
-          fontWeight: FontWeight.bold,
-          fontSize: 20,
-        ),
-      ),
-      const Spacer(),
-      Text(
-        _viewLabel(state.view),
-        style: const TextStyle(color: _muted, fontWeight: FontWeight.bold),
-      ),
-      SizedBox(width: usesTerminalPresentation ? 4 : 8),
-      IconButton(
-        tooltip: 'New task (N)',
-        onPressed: onNewTask,
-        icon: const Icon(Icons.add_task),
-      ),
-      IconButton(
-        tooltip: 'New list (Ctrl+N)',
-        onPressed: onCreateList,
-        icon: const Icon(Icons.playlist_add),
-      ),
-      PopupMenuButton<String>(
-        tooltip: 'List actions',
-        onSelected: (value) {
-          if (value == 'rename') onRenameList();
-          if (value == 'delete') onDeleteList();
-        },
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'rename', child: Text('Rename list')),
-          PopupMenuItem(value: 'delete', child: Text('Delete list')),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final terminal = usesTerminalPresentation;
+    return SizedBox(
+      height: terminal ? TerminalMetrics.line : null,
+      child: Row(
+        children: [
+          Container(
+            color: terminal ? _violet : Colors.transparent,
+            padding: EdgeInsets.symmetric(horizontal: terminal ? 8 : 0),
+            alignment: Alignment.center,
+            child: Text(
+              terminal ? ' FOCUS LIST ' : 'FOCUS LIST',
+              style: TextStyle(
+                color: terminal ? terminalBackground : _violet,
+                fontWeight: FontWeight.bold,
+                fontSize: terminal ? null : 20,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Text(
+            _viewLabel(state.view),
+            style: const TextStyle(color: _muted, fontWeight: FontWeight.bold),
+          ),
+          if (!terminal) ...[
+            const SizedBox(width: 8),
+            IconButton(
+              tooltip: 'New task (N)',
+              onPressed: onNewTask,
+              icon: const Icon(Icons.add_task),
+            ),
+            IconButton(
+              tooltip: 'New list (Ctrl+N)',
+              onPressed: onCreateList,
+              icon: const Icon(Icons.playlist_add),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'List actions',
+              onSelected: (value) {
+                if (value == 'rename') onRenameList();
+                if (value == 'delete') onDeleteList();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'rename', child: Text('Rename list')),
+                PopupMenuItem(value: 'delete', child: Text('Delete list')),
+              ],
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'App actions',
+              onSelected: (value) {
+                if (value == 'multi') {
+                  ref
+                      .read(workspaceViewModelProvider.notifier)
+                      .toggleMultiView();
+                }
+                if (value == 'settings') onSettings();
+                if (value == 'help') onHelp();
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'multi', child: Text('Toggle Multi view')),
+                PopupMenuItem(value: 'settings', child: Text('Settings')),
+                PopupMenuItem(value: 'help', child: Text('Keyboard shortcuts')),
+              ],
+            ),
+          ],
         ],
       ),
-      PopupMenuButton<String>(
-        tooltip: 'App actions',
-        onSelected: (value) {
-          if (value == 'multi') {
-            ref.read(workspaceViewModelProvider.notifier).toggleMultiView();
-          }
-          if (value == 'settings') onSettings();
-          if (value == 'help') onHelp();
-        },
-        itemBuilder: (_) => const [
-          PopupMenuItem(value: 'multi', child: Text('Toggle Multi view')),
-          PopupMenuItem(value: 'settings', child: Text('Settings')),
-          PopupMenuItem(value: 'help', child: Text('Keyboard shortcuts')),
-        ],
-      ),
-    ],
-  );
+    );
+  }
 }
 
 class _Tabs extends ConsumerWidget {
@@ -429,11 +456,12 @@ class _Tabs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => SizedBox(
-    height: usesTerminalPresentation ? 34 : 42,
+    height: usesTerminalPresentation ? TerminalMetrics.line : 42,
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       itemCount: state.lists.length,
-      separatorBuilder: (_, _) => const SizedBox(width: 6),
+      separatorBuilder: (_, _) =>
+          SizedBox(width: usesTerminalPresentation ? 0 : 6),
       itemBuilder: (_, index) {
         final list = state.lists[index];
         final selected =
@@ -448,21 +476,17 @@ class _Tabs extends ConsumerWidget {
                       .read(workspaceViewModelProvider.notifier)
                       .selectList(list.id),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: selected ? _violet : _panel,
-                      border: Border.all(color: selected ? _violet : _muted),
-                    ),
+                    height: TerminalMetrics.line,
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    color: selected ? _violet : _panel,
                     child: Text(
-                      selected
-                          ? '> ${list.name.toUpperCase()}'
-                          : '  ${list.name}',
+                      ' ${list.name} ',
                       style: TextStyle(
                         color: selected ? const Color(0xff0d0f18) : _muted,
-                        fontWeight: FontWeight.bold,
+                        fontWeight: selected
+                            ? FontWeight.bold
+                            : FontWeight.normal,
                       ),
                     ),
                   ),
@@ -505,7 +529,7 @@ class _TaskPanel extends ConsumerWidget {
         color: _panel,
         border: Border.all(color: border),
         borderRadius: usesTerminalPresentation
-            ? BorderRadius.zero
+            ? BorderRadius.circular(TerminalMetrics.panelRadius)
             : BorderRadius.circular(12),
       ),
       child: content,
@@ -519,7 +543,9 @@ class _ListContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListView(
-    padding: const EdgeInsets.all(12),
+    padding: usesTerminalPresentation
+        ? TerminalMetrics.panelPadding
+        : const EdgeInsets.all(12),
     children: [
       for (final status in const [
         TaskStatus.doing,
@@ -552,7 +578,9 @@ class _FocusContent extends StatelessWidget {
             .toList() ??
         const [];
     return ListView(
-      padding: const EdgeInsets.all(12),
+      padding: usesTerminalPresentation
+          ? TerminalMetrics.panelPadding
+          : const EdgeInsets.all(12),
       children: [
         if (tasks.isEmpty) const _EmptyState('No doing tasks'),
         for (final task in tasks) _TaskRow(task: task, state: state),
@@ -574,7 +602,9 @@ class _CompletedContent extends StatelessWidget {
       );
     }
     return ListView.builder(
-      padding: const EdgeInsets.all(12),
+      padding: usesTerminalPresentation
+          ? TerminalMetrics.panelPadding
+          : const EdgeInsets.all(12),
       itemCount: entries.length,
       itemBuilder: (_, index) {
         final entry = entries[index];
@@ -602,7 +632,10 @@ class _MultiContent extends StatelessWidget {
       if (visible.isEmpty) continue;
       children.add(
         Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 4),
+          padding: EdgeInsets.only(
+            top: usesTerminalPresentation ? 0 : 8,
+            bottom: usesTerminalPresentation ? 0 : 4,
+          ),
           child: Text(
             list.name.toUpperCase(),
             style: const TextStyle(color: _amber, fontWeight: FontWeight.bold),
@@ -625,7 +658,12 @@ class _MultiContent extends StatelessWidget {
     }
     return children.isEmpty
         ? const _EmptyState('No Doing or Pending tasks')
-        : ListView(padding: const EdgeInsets.all(12), children: children);
+        : ListView(
+            padding: usesTerminalPresentation
+                ? TerminalMetrics.panelPadding
+                : const EdgeInsets.all(12),
+            children: children,
+          );
   }
 }
 
@@ -644,7 +682,7 @@ class _TaskSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
+      padding: EdgeInsets.only(bottom: usesTerminalPresentation ? 0 : 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -655,10 +693,13 @@ class _TaskSection extends StatelessWidget {
               fontWeight: FontWeight.bold,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: usesTerminalPresentation ? 0 : 4),
           if (tasks.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(left: 8),
+            Padding(
+              padding: EdgeInsets.only(
+                left: 8,
+                bottom: usesTerminalPresentation ? TerminalMetrics.line : 0,
+              ),
               child: Text('· empty', style: TextStyle(color: _muted)),
             )
           else
@@ -705,13 +746,14 @@ class _TaskRow extends ConsumerWidget {
             ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
         borderRadius: terminal ? BorderRadius.zero : BorderRadius.circular(5),
         child: AnimatedContainer(
+          constraints: const BoxConstraints(),
           duration: terminal
               ? Duration.zero
               : const Duration(milliseconds: 220),
           margin: EdgeInsets.symmetric(vertical: terminal ? 0 : 2),
           padding: EdgeInsets.symmetric(
-            horizontal: 8,
-            vertical: terminal ? 6 : 9,
+            horizontal: terminal ? 0 : 8,
+            vertical: terminal ? 0 : 9,
           ),
           decoration: BoxDecoration(
             color: animated
@@ -722,11 +764,7 @@ class _TaskRow extends ConsumerWidget {
             borderRadius: terminal
                 ? BorderRadius.zero
                 : BorderRadius.circular(5),
-            border: terminal
-                ? Border(
-                    bottom: BorderSide(color: _muted.withValues(alpha: .35)),
-                  )
-                : null,
+            border: null,
           ),
           child: Row(
             children: [
@@ -739,11 +777,18 @@ class _TaskRow extends ConsumerWidget {
               ),
               Expanded(child: title),
               if (task.daily)
-                Icon(
-                  Icons.repeat,
-                  size: 16,
-                  color: selected ? const Color(0xff0d0f18) : _green,
-                ),
+                terminal
+                    ? Text(
+                        ' ↻',
+                        style: TextStyle(
+                          color: selected ? const Color(0xff0d0f18) : _green,
+                        ),
+                      )
+                    : Icon(
+                        Icons.repeat,
+                        size: 16,
+                        color: selected ? const Color(0xff0d0f18) : _green,
+                      ),
               if (completedAt != null)
                 Padding(
                   padding: const EdgeInsets.only(left: 8),
@@ -755,7 +800,7 @@ class _TaskRow extends ConsumerWidget {
                     ),
                   ),
                 ),
-              if (completedAt == null)
+              if (completedAt == null && !terminal)
                 IconButton(
                   tooltip: 'Advance task',
                   color: selected
@@ -773,28 +818,29 @@ class _TaskRow extends ConsumerWidget {
                   },
                   icon: const Icon(Icons.play_arrow),
                 ),
-              PopupMenuButton<String>(
-                tooltip: 'Task actions',
-                icon: Icon(
-                  Icons.more_vert,
-                  color: selected ? const Color(0xff0d0f18) : _muted,
-                ),
-                onSelected: (action) =>
-                    _handleTaskAction(context, ref, task, action),
-                itemBuilder: (_) => [
-                  if (task.status == TaskStatus.done)
-                    const PopupMenuItem(
-                      value: 'revert',
-                      child: Text('Reopen in Doing'),
-                    ),
-                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                  const PopupMenuItem(
-                    value: 'duplicate',
-                    child: Text('Duplicate'),
+              if (!terminal)
+                PopupMenuButton<String>(
+                  tooltip: 'Task actions',
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: selected ? const Color(0xff0d0f18) : _muted,
                   ),
-                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-              ),
+                  onSelected: (action) =>
+                      _handleTaskAction(context, ref, task, action),
+                  itemBuilder: (_) => [
+                    if (task.status == TaskStatus.done)
+                      const PopupMenuItem(
+                        value: 'revert',
+                        child: Text('Reopen in Doing'),
+                      ),
+                    const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                    const PopupMenuItem(
+                      value: 'duplicate',
+                      child: Text('Duplicate'),
+                    ),
+                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                  ],
+                ),
             ],
           ),
         ),
@@ -912,38 +958,157 @@ class _TaskTitleState extends State<_TaskTitle> {
 }
 
 class _Footer extends ConsumerWidget {
-  const _Footer({required this.state, required this.grabbed});
+  const _Footer({
+    required this.state,
+    required this.grabbed,
+    required this.onNewTask,
+    required this.onCreateList,
+    required this.onRenameList,
+    required this.onDeleteList,
+    required this.onSettings,
+    required this.onHelp,
+  });
   final WorkspaceState state;
   final bool grabbed;
+  final VoidCallback onNewTask;
+  final VoidCallback onCreateList;
+  final VoidCallback onRenameList;
+  final VoidCallback onDeleteList;
+  final VoidCallback onSettings;
+  final VoidCallback onHelp;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      if (state.notice != null)
-        Text(
-          state.notice!.text,
-          style: TextStyle(
-            color: state.notice!.error ? _red : _green,
-            fontWeight: FontWeight.bold,
+  Widget build(BuildContext context, WidgetRef ref) {
+    final terminal = usesTerminalPresentation;
+    final activity = state.notice != null
+        ? Text(
+            ' ${state.notice!.text} ',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: state.notice!.error ? _red : _green,
+              fontWeight: FontWeight.bold,
+            ),
+          )
+        : grabbed
+        ? const Text(
+            ' SPACE armed — F advance, ↑↓ reorder ',
+            style: TextStyle(color: _amber, fontWeight: FontWeight.bold),
+          )
+        : state.selectedTask?.daily ?? false
+        ? Text(
+            ' Daily: ${_dailyActivity(state.selectedTask!)}',
+            style: const TextStyle(color: _green, fontWeight: FontWeight.bold),
+          )
+        : const SizedBox.shrink();
+
+    if (!terminal) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          activity,
+          const SizedBox(height: 3),
+          const Text(
+            'Ctrl+A multi   Tab lists   ↑↓ move   N new   Space+F advance   Space+↑↓ sort   ? help',
+            style: TextStyle(color: _muted, fontSize: 12),
           ),
-        )
-      else if (grabbed)
-        const Text(
-          'SPACE armed — F advance, ↑↓ reorder',
-          style: TextStyle(color: _amber, fontWeight: FontWeight.bold),
-        )
-      else if (state.selectedTask?.daily ?? false)
-        Text(
-          'Daily: ${_dailyActivity(state.selectedTask!)}',
-          style: const TextStyle(color: _green, fontWeight: FontWeight.bold),
-        ),
-      const SizedBox(height: 3),
-      const Text(
-        'Ctrl+A multi   Tab lists   ↑↓ move   N new   Space+F advance   Space+↑↓ sort   ? help',
-        style: TextStyle(color: _muted, fontSize: 12),
+        ],
+      );
+    }
+
+    return SizedBox(
+      height: TerminalMetrics.line * 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: TerminalMetrics.line, child: activity),
+          SizedBox(
+            height: TerminalMetrics.line,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              children: [
+                _TerminalCommand(
+                  keys: 'ctrl+a',
+                  label: 'multi',
+                  onTap: ref
+                      .read(workspaceViewModelProvider.notifier)
+                      .toggleMultiView,
+                ),
+                _TerminalCommand(
+                  keys: 'tab',
+                  label: 'lists',
+                  onTap: () => ref
+                      .read(workspaceViewModelProvider.notifier)
+                      .cycleList(1),
+                ),
+                const _TerminalCommand(keys: '↑↓', label: 'move'),
+                _TerminalCommand(keys: 'n', label: 'new', onTap: onNewTask),
+                const _TerminalCommand(keys: 'space f', label: 'advance'),
+                const _TerminalCommand(keys: 'space ↑↓', label: 'sort'),
+                _TerminalCommand(
+                  keys: 'ctrl+n',
+                  label: 'new list',
+                  onTap: onCreateList,
+                ),
+                _TerminalCommand(
+                  keys: 'f2',
+                  label: 'rename',
+                  onTap: onRenameList,
+                ),
+                _TerminalCommand(
+                  keys: 'ctrl+x',
+                  label: 'del list',
+                  onTap: onDeleteList,
+                ),
+                _TerminalCommand(
+                  keys: 'g',
+                  label: 'settings',
+                  onTap: onSettings,
+                ),
+                _TerminalCommand(keys: '?', label: 'help', onTap: onHelp),
+              ],
+            ),
+          ),
+        ],
       ),
-    ],
+    );
+  }
+}
+
+class _TerminalCommand extends StatelessWidget {
+  const _TerminalCommand({required this.keys, required this.label, this.onTap});
+  final String keys;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: onTap != null,
+    label: '$label command ($keys)',
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 3),
+        child: Text.rich(
+          TextSpan(
+            children: [
+              TextSpan(
+                text: ' $keys ',
+                style: const TextStyle(
+                  color: _violet,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextSpan(
+                text: '$label  ',
+                style: const TextStyle(color: _muted),
+              ),
+            ],
+          ),
+          maxLines: 1,
+        ),
+      ),
+    ),
   );
 }
 
@@ -1022,11 +1187,18 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                 minLines: 1,
                 decoration: const InputDecoration(labelText: 'Task title'),
               ),
-              SwitchListTile(
-                value: _daily,
-                onChanged: (value) => setState(() => _daily = value),
-                title: const Text('Daily task'),
-              ),
+              if (usesTerminalPresentation)
+                _TerminalToggle(
+                  value: _daily,
+                  label: 'Daily task',
+                  onChanged: (value) => setState(() => _daily = value),
+                )
+              else
+                SwitchListTile(
+                  value: _daily,
+                  onChanged: (value) => setState(() => _daily = value),
+                  title: const Text('Daily task'),
+                ),
             ],
           ),
         ),
@@ -1107,15 +1279,26 @@ class _SettingsDialog extends ConsumerWidget {
                 settings.copyWith(marqueeSpeedMs: (value / 25).round() * 25),
               ),
             ),
-            SwitchListTile(
-              value: settings.longTitleDisplay == LongTitleDisplay.wrap,
-              onChanged: (_) => vm.updateSettings(
-                settings.copyWith(
-                  longTitleDisplay: settings.longTitleDisplay.toggled,
+            if (usesTerminalPresentation)
+              _TerminalToggle(
+                value: settings.longTitleDisplay == LongTitleDisplay.wrap,
+                onChanged: (_) => vm.updateSettings(
+                  settings.copyWith(
+                    longTitleDisplay: settings.longTitleDisplay.toggled,
+                  ),
                 ),
+                label: 'Wrap long titles',
+              )
+            else
+              SwitchListTile(
+                value: settings.longTitleDisplay == LongTitleDisplay.wrap,
+                onChanged: (_) => vm.updateSettings(
+                  settings.copyWith(
+                    longTitleDisplay: settings.longTitleDisplay.toggled,
+                  ),
+                ),
+                title: const Text('Wrap long titles'),
               ),
-              title: const Text('Wrap long titles'),
-            ),
             Text('Desktop font size: ${settings.nativeFontSize} pt'),
             Slider(
               value: settings.nativeFontSize.toDouble(),
@@ -1137,6 +1320,43 @@ class _SettingsDialog extends ConsumerWidget {
       ],
     );
   }
+}
+
+class _TerminalToggle extends StatelessWidget {
+  const _TerminalToggle({
+    required this.value,
+    required this.label,
+    required this.onChanged,
+  });
+  final bool value;
+  final String label;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    toggled: value,
+    button: true,
+    label: label,
+    child: InkWell(
+      onTap: () => onChanged(!value),
+      child: SizedBox(
+        height: TerminalMetrics.line,
+        child: Row(
+          children: [
+            Text(
+              value ? '[x]' : '[ ]',
+              style: const TextStyle(
+                color: _violet,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(width: TerminalMetrics.cell),
+            Text(label),
+          ],
+        ),
+      ),
+    ),
+  );
 }
 
 String _viewLabel(WorkspaceView view) => switch (view) {

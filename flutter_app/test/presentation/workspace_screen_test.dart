@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -10,6 +12,10 @@ void main() {
   testWidgets('workspace loads its default list and exposes pointer commands', (
     tester,
   ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(1000, 700));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
@@ -21,11 +27,47 @@ void main() {
     );
     await tester.pump(const Duration(milliseconds: 20));
 
-    expect(find.text('FOCUS LIST'), findsOneWidget);
-    expect(find.text('Tasks'), findsOneWidget);
-    expect(find.byTooltip('New task (N)'), findsOneWidget);
-    expect(find.byTooltip('New list (Ctrl+N)'), findsOneWidget);
+    expect(find.textContaining('FOCUS LIST'), findsOneWidget);
+    expect(find.textContaining('Tasks'), findsOneWidget);
+    expect(find.bySemanticsLabel(RegExp('new command')), findsOneWidget);
+    expect(
+      find.bySemanticsLabel(RegExp('new list command'), skipOffstage: false),
+      findsOneWidget,
+    );
+    expect(find.byType(FloatingActionButton), findsNothing);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
   });
+
+  testWidgets(
+    'terminal workspace remains usable in a constrained browser size',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.binding.setSurfaceSize(const Size(420, 360));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            taskListRepositoryProvider.overrideWithValue(_Lists()),
+            settingsRepositoryProvider.overrideWithValue(_Settings()),
+          ],
+          child: const FocusListApp(),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+
+      expect(find.textContaining('FOCUS LIST'), findsOneWidget);
+      await tester.dragFrom(const Offset(390, 350), const Offset(-1800, 0));
+      await tester.pump();
+      expect(
+        find.bySemanticsLabel(RegExp('help command'), skipOffstage: false),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
 }
 
 class _Lists implements TaskListRepository {

@@ -1,12 +1,11 @@
 import 'package:flutter/foundation.dart';
 
-/// Desktop and web get the compact, terminal-inspired presentation.
-/// Touch-first platforms retain the Material-oriented controls.
+/// The browser and Linux build mirror the Rust terminal application.
+/// Other Flutter targets retain the touch-oriented Material presentation.
 bool get usesTerminalPresentation =>
-    kIsWeb ||
-    switch (defaultTargetPlatform) {
-      TargetPlatform.linux ||
-      TargetPlatform.macOS ||
-      TargetPlatform.windows => true,
-      _ => false,
-    };
+    usesTerminalPresentationFor(isWeb: kIsWeb, platform: defaultTargetPlatform);
+
+bool usesTerminalPresentationFor({
+  required bool isWeb,
+  required TargetPlatform platform,
+}) => isWeb || platform == TargetPlatform.linux;
