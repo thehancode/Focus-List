@@ -23,3 +23,17 @@ bool usesFramelessDesktopWindowFor({
 }) =>
     !isWeb &&
     (platform == TargetPlatform.linux || platform == TargetPlatform.windows);
+
+/// Window placement is restored only on the desktop targets that use the
+/// custom native window treatment.
+bool get usesWindowPositionPersistence => usesWindowPositionPersistenceFor(
+  isWeb: kIsWeb,
+  platform: defaultTargetPlatform,
+);
+
+bool usesWindowPositionPersistenceFor({
+  required bool isWeb,
+  required TargetPlatform platform,
+}) =>
+    !isWeb &&
+    (platform == TargetPlatform.linux || platform == TargetPlatform.windows);
