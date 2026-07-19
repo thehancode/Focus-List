@@ -59,7 +59,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get keyboardShortcuts => 'Atajos de teclado';
+  String get keyboardShortcuts => 'Atajos';
 
   @override
   String get keyboardShortcutsHelp =>
@@ -78,10 +78,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get newListTooltip => 'Nueva lista (Ctrl+N)';
 
   @override
-  String get listActions => 'Acciones de lista';
+  String get listActions => 'Lista';
 
   @override
-  String get appActions => 'Acciones de aplicación';
+  String get appActions => 'Menú';
 
   @override
   String get newList => 'Nueva lista';
@@ -90,7 +90,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get renameList => 'Renombrar lista';
 
   @override
-  String get toggleMultiView => 'Alternar vista múltiple';
+  String get toggleMultiView => 'Multivista';
 
   @override
   String get settings => 'Ajustes';
@@ -101,16 +101,16 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get listView => 'VISTA DE LISTA';
+  String get listView => 'LISTA';
 
   @override
-  String get doingFocus => 'ENFOQUE EN CURSO';
+  String get doingFocus => 'EN CURSO';
 
   @override
-  String get completed => 'COMPLETADAS';
+  String get completed => 'HECHAS';
 
   @override
-  String get multiView => 'VISTA MÚLTIPLE';
+  String get multiView => 'MULTIVISTA';
 
   @override
   String get pending => 'Pendiente';
@@ -145,13 +145,13 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get advanceTask => 'Avanzar tarea';
+  String get advanceTask => 'Avanzar';
 
   @override
-  String get taskActions => 'Acciones de tarea';
+  String get taskActions => 'Tarea';
 
   @override
-  String get reopenInDoing => 'Reabrir en curso';
+  String get reopenInDoing => 'Reabrir';
 
   @override
   String get edit => 'Editar';
@@ -213,13 +213,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get commandHelp => 'ayuda';
 
   @override
-  String get taskTitle => 'Título de la tarea';
+  String get taskTitle => 'Título';
 
   @override
-  String get dailyTask => 'Tarea diaria';
+  String get dailyTask => 'Diaria';
 
   @override
-  String get listName => 'Nombre de la lista';
+  String get listName => 'Lista';
 
   @override
   String get tagNamesCannotBeEmpty =>
@@ -231,7 +231,7 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get wrapLongTitles => 'Ajustar títulos largos';
+  String get wrapLongTitles => 'Ajustar títulos';
 
   @override
   String desktopFontSize(int points) {
@@ -239,10 +239,10 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get tagNames => 'Nombres de etiquetas';
+  String get tagNames => 'Etiquetas';
 
   @override
-  String get saveTagNames => 'Guardar nombres de etiquetas';
+  String get saveTagNames => 'Guardar etiquetas';
 
   @override
   String get language => 'Idioma';
@@ -311,7 +311,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   }
 
   @override
-  String get keyboardShortcuts => 'Atajos de teclado';
+  String get keyboardShortcuts => 'Atajos';
 
   @override
   String get keyboardShortcutsHelp =>
@@ -330,22 +330,22 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get newListTooltip => 'Nueva lista (Ctrl+N)';
 
   @override
-  String get listActions => 'Acciones de lista';
+  String get listActions => 'Lista';
 
   @override
-  String get appActions => 'Acciones de la aplicación';
+  String get appActions => 'Menú';
 
   @override
   String get newList => 'Nueva lista';
 
   @override
-  String get renameList => 'Cambiar nombre de la lista';
+  String get renameList => 'Renombrar lista';
 
   @override
-  String get toggleMultiView => 'Alternar vista múltiple';
+  String get toggleMultiView => 'Multivista';
 
   @override
-  String get settings => 'Configuración';
+  String get settings => 'Ajustes';
 
   @override
   String taskList(Object listName) {
@@ -353,16 +353,16 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   }
 
   @override
-  String get listView => 'VISTA DE LISTA';
+  String get listView => 'LISTA';
 
   @override
-  String get doingFocus => 'ENFOQUE EN CURSO';
+  String get doingFocus => 'EN CURSO';
 
   @override
-  String get completed => 'COMPLETADAS';
+  String get completed => 'HECHAS';
 
   @override
-  String get multiView => 'VISTA MÚLTIPLE';
+  String get multiView => 'MULTIVISTA';
 
   @override
   String get pending => 'Pendiente';
@@ -397,13 +397,13 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   }
 
   @override
-  String get advanceTask => 'Avanzar tarea';
+  String get advanceTask => 'Avanzar';
 
   @override
-  String get taskActions => 'Acciones de tarea';
+  String get taskActions => 'Tarea';
 
   @override
-  String get reopenInDoing => 'Reabrir en curso';
+  String get reopenInDoing => 'Reabrir';
 
   @override
   String get edit => 'Editar';
@@ -465,13 +465,13 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get commandHelp => 'ayuda';
 
   @override
-  String get taskTitle => 'Título de la tarea';
+  String get taskTitle => 'Título';
 
   @override
-  String get dailyTask => 'Tarea diaria';
+  String get dailyTask => 'Diaria';
 
   @override
-  String get listName => 'Nombre de la lista';
+  String get listName => 'Lista';
 
   @override
   String get tagNamesCannotBeEmpty =>
@@ -483,7 +483,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   }
 
   @override
-  String get wrapLongTitles => 'Ajustar títulos largos';
+  String get wrapLongTitles => 'Ajustar títulos';
 
   @override
   String desktopFontSize(int points) {
@@ -491,10 +491,10 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   }
 
   @override
-  String get tagNames => 'Nombres de las etiquetas';
+  String get tagNames => 'Etiquetas';
 
   @override
-  String get saveTagNames => 'Guardar nombres de las etiquetas';
+  String get saveTagNames => 'Guardar etiquetas';
 
   @override
   String get language => 'Idioma';
@@ -563,7 +563,7 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   }
 
   @override
-  String get keyboardShortcuts => 'Atajos de teclado';
+  String get keyboardShortcuts => 'Atajos';
 
   @override
   String get keyboardShortcutsHelp =>
@@ -582,10 +582,10 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String get newListTooltip => 'Nueva lista (Ctrl+N)';
 
   @override
-  String get listActions => 'Acciones de lista';
+  String get listActions => 'Lista';
 
   @override
-  String get appActions => 'Acciones de aplicación';
+  String get appActions => 'Menú';
 
   @override
   String get newList => 'Nueva lista';
@@ -594,7 +594,7 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String get renameList => 'Renombrar lista';
 
   @override
-  String get toggleMultiView => 'Alternar vista múltiple';
+  String get toggleMultiView => 'Multivista';
 
   @override
   String get settings => 'Ajustes';
@@ -605,16 +605,16 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   }
 
   @override
-  String get listView => 'VISTA DE LISTA';
+  String get listView => 'LISTA';
 
   @override
-  String get doingFocus => 'ENFOQUE EN CURSO';
+  String get doingFocus => 'EN CURSO';
 
   @override
-  String get completed => 'COMPLETADAS';
+  String get completed => 'HECHAS';
 
   @override
-  String get multiView => 'VISTA MÚLTIPLE';
+  String get multiView => 'MULTIVISTA';
 
   @override
   String get pending => 'Pendiente';
@@ -649,13 +649,13 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   }
 
   @override
-  String get advanceTask => 'Avanzar tarea';
+  String get advanceTask => 'Avanzar';
 
   @override
-  String get taskActions => 'Acciones de tarea';
+  String get taskActions => 'Tarea';
 
   @override
-  String get reopenInDoing => 'Reabrir en curso';
+  String get reopenInDoing => 'Reabrir';
 
   @override
   String get edit => 'Editar';
@@ -717,13 +717,13 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String get commandHelp => 'ayuda';
 
   @override
-  String get taskTitle => 'Título de la tarea';
+  String get taskTitle => 'Título';
 
   @override
-  String get dailyTask => 'Tarea diaria';
+  String get dailyTask => 'Diaria';
 
   @override
-  String get listName => 'Nombre de la lista';
+  String get listName => 'Lista';
 
   @override
   String get tagNamesCannotBeEmpty =>
@@ -735,7 +735,7 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   }
 
   @override
-  String get wrapLongTitles => 'Ajustar títulos largos';
+  String get wrapLongTitles => 'Ajustar títulos';
 
   @override
   String desktopFontSize(int points) {
@@ -743,10 +743,10 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   }
 
   @override
-  String get tagNames => 'Nombres de etiquetas';
+  String get tagNames => 'Etiquetas';
 
   @override
-  String get saveTagNames => 'Guardar nombres de etiquetas';
+  String get saveTagNames => 'Guardar etiquetas';
 
   @override
   String get language => 'Idioma';

@@ -19,6 +19,9 @@ translated.
 - This is a task-list application: use task/list/status vocabulary consistently.
   Do not translate task titles, list names, or custom tag names: they are user
   content.
+- Keep button labels and dialog or panel titles short: prefer one or two words.
+  Use the English source label's length as the space budget; choose a shorter
+  Spanish equivalent when a direct translation would be noticeably longer.
 - Run `flutter gen-l10n`, `flutter analyze`, and `flutter test` after catalog
   changes. Update widget tests when visible English text intentionally changes.
 
