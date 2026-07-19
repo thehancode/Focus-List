@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation/workspace_screen.dart';
 import '../presentation/workspace_view_model.dart';
+import 'ui_mode.dart';
 
 class FocusListApp extends ConsumerWidget {
   const FocusListApp({super.key});
@@ -24,11 +25,71 @@ class FocusListApp extends ConsumerWidget {
       fontFamily: 'UbuntuMonoNerd',
       dialogTheme: const DialogThemeData(backgroundColor: Color(0xff161926)),
     );
+    final terminal = usesTerminalPresentation;
     return MaterialApp(
       title: 'Focus List',
       debugShowCheckedModeBanner: false,
       theme: base.copyWith(
         textTheme: _scaleTextTheme(base.textTheme, fontScale),
+        visualDensity: terminal ? VisualDensity.compact : null,
+        splashFactory: terminal ? NoSplash.splashFactory : null,
+        dialogTheme: terminal
+            ? const DialogThemeData(
+                backgroundColor: Color(0xff161926),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                  side: BorderSide(color: Color(0xff767c94)),
+                ),
+              )
+            : base.dialogTheme,
+        inputDecorationTheme: terminal
+            ? const InputDecorationTheme(
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.zero),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: Color(0xff767c94)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.zero,
+                  borderSide: BorderSide(color: Color(0xffb794f4), width: 2),
+                ),
+              )
+            : null,
+        textButtonTheme: terminal
+            ? TextButtonThemeData(
+                style: TextButton.styleFrom(
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                ),
+              )
+            : null,
+        filledButtonTheme: terminal
+            ? FilledButtonThemeData(
+                style: FilledButton.styleFrom(
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.zero,
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                ),
+              )
+            : null,
+        popupMenuTheme: terminal
+            ? const PopupMenuThemeData(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.zero,
+                  side: BorderSide(color: Color(0xff767c94)),
+                ),
+              )
+            : null,
       ),
       home: const WorkspaceScreen(),
     );

@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../app/ui_mode.dart';
 import '../domain/models.dart';
+import 'terminal_grid.dart';
 import 'workspace_view_model.dart';
 
 const _panel = Color(0xff161926);
@@ -290,6 +292,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workspaceViewModelProvider);
+    final terminal = usesTerminalPresentation;
     if (state.phase == WorkspacePhase.loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -298,6 +301,30 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
         body: Center(child: Text(state.error ?? 'Could not load Focus List')),
       );
     }
+    final workspace = SafeArea(
+      child: Padding(
+        padding: EdgeInsets.all(terminal ? 10 : 12),
+        child: Column(
+          children: [
+            _Header(
+              state: state,
+              onNewTask: _showTaskEditor,
+              onCreateList: _showListEditor,
+              onRenameList: () => _showListEditor(rename: true),
+              onDeleteList: _confirmDeleteList,
+              onSettings: _showSettings,
+              onHelp: _showHelp,
+            ),
+            SizedBox(height: terminal ? 6 : 8),
+            _Tabs(state: state),
+            SizedBox(height: terminal ? 6 : 10),
+            Expanded(child: _TaskPanel(state: state)),
+            SizedBox(height: terminal ? 6 : 8),
+            _Footer(state: state, grabbed: _grabbed),
+          ],
+        ),
+      ),
+    );
     return Focus(
       focusNode: _focusNode,
       autofocus: true,
@@ -310,30 +337,12 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
                 label: const Text('Task'),
               )
             : null,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                _Header(
-                  state: state,
-                  onNewTask: _showTaskEditor,
-                  onCreateList: _showListEditor,
-                  onRenameList: () => _showListEditor(rename: true),
-                  onDeleteList: _confirmDeleteList,
-                  onSettings: _showSettings,
-                  onHelp: _showHelp,
-                ),
-                const SizedBox(height: 8),
-                _Tabs(state: state),
-                const SizedBox(height: 10),
-                Expanded(child: _TaskPanel(state: state)),
-                const SizedBox(height: 8),
-                _Footer(state: state, grabbed: _grabbed),
-              ],
-            ),
-          ),
-        ),
+        body: terminal
+            ? TerminalGrid(
+                fontSize: state.settings.nativeFontSize.toDouble(),
+                child: workspace,
+              )
+            : workspace,
       ),
     );
   }
@@ -360,8 +369,8 @@ class _Header extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) => Row(
     children: [
-      const Text(
-        'FOCUS LIST',
+      Text(
+        usesTerminalPresentation ? '[ FOCUS LIST ]' : 'FOCUS LIST',
         style: TextStyle(
           color: _violet,
           fontWeight: FontWeight.bold,
@@ -373,7 +382,7 @@ class _Header extends ConsumerWidget {
         _viewLabel(state.view),
         style: const TextStyle(color: _muted, fontWeight: FontWeight.bold),
       ),
-      const SizedBox(width: 8),
+      SizedBox(width: usesTerminalPresentation ? 4 : 8),
       IconButton(
         tooltip: 'New task (N)',
         onPressed: onNewTask,
@@ -420,7 +429,7 @@ class _Tabs extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) => SizedBox(
-    height: 42,
+    height: usesTerminalPresentation ? 34 : 42,
     child: ListView.separated(
       scrollDirection: Axis.horizontal,
       itemCount: state.lists.length,
@@ -433,14 +442,39 @@ class _Tabs extends ConsumerWidget {
           selected: selected,
           button: true,
           label: 'Task list ${list.name}',
-          child: ChoiceChip(
-            selected: selected,
-            label: Text(list.name),
-            selectedColor: _violet,
-            onSelected: (_) => ref
-                .read(workspaceViewModelProvider.notifier)
-                .selectList(list.id),
-          ),
+          child: usesTerminalPresentation
+              ? InkWell(
+                  onTap: () => ref
+                      .read(workspaceViewModelProvider.notifier)
+                      .selectList(list.id),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 7,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected ? _violet : _panel,
+                      border: Border.all(color: selected ? _violet : _muted),
+                    ),
+                    child: Text(
+                      selected
+                          ? '> ${list.name.toUpperCase()}'
+                          : '  ${list.name}',
+                      style: TextStyle(
+                        color: selected ? const Color(0xff0d0f18) : _muted,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                )
+              : ChoiceChip(
+                  selected: selected,
+                  label: Text(list.name),
+                  selectedColor: _violet,
+                  onSelected: (_) => ref
+                      .read(workspaceViewModelProvider.notifier)
+                      .selectList(list.id),
+                ),
         );
       },
     ),
@@ -470,7 +504,9 @@ class _TaskPanel extends ConsumerWidget {
       decoration: BoxDecoration(
         color: _panel,
         border: Border.all(color: border),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: usesTerminalPresentation
+            ? BorderRadius.zero
+            : BorderRadius.circular(12),
       ),
       child: content,
     );
@@ -641,6 +677,7 @@ class _TaskRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final terminal = usesTerminalPresentation;
     final selected = task.id == state.selectedTaskId;
     final done = task.status == TaskStatus.done;
     final animated = task.id == state.animatedTaskId;
@@ -666,18 +703,30 @@ class _TaskRow extends ConsumerWidget {
       child: InkWell(
         onTap: () =>
             ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
-        borderRadius: BorderRadius.circular(5),
+        borderRadius: terminal ? BorderRadius.zero : BorderRadius.circular(5),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          margin: const EdgeInsets.symmetric(vertical: 2),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+          duration: terminal
+              ? Duration.zero
+              : const Duration(milliseconds: 220),
+          margin: EdgeInsets.symmetric(vertical: terminal ? 0 : 2),
+          padding: EdgeInsets.symmetric(
+            horizontal: 8,
+            vertical: terminal ? 6 : 9,
+          ),
           decoration: BoxDecoration(
             color: animated
                 ? _statusColor(task.status)
                 : selected
                 ? _violet
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(5),
+            borderRadius: terminal
+                ? BorderRadius.zero
+                : BorderRadius.circular(5),
+            border: terminal
+                ? Border(
+                    bottom: BorderSide(color: _muted.withValues(alpha: .35)),
+                  )
+                : null,
           ),
           child: Row(
             children: [
