@@ -16,7 +16,23 @@ G_DEFINE_TYPE(MyApplication, my_application, GTK_TYPE_APPLICATION)
 
 // Called when first Flutter frame received.
 static void first_frame_cb(MyApplication* self, FlView* view) {
-  gtk_widget_show(gtk_widget_get_toplevel(GTK_WIDGET(view)));
+  GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
+  gtk_widget_show(toplevel);
+
+  // gtk_window_present() uses the current GTK event timestamp. There is no
+  // input event during startup, so under XWayland that timestamp is zero and
+  // GNOME may reject the activation request as focus stealing. Once the first
+  // frame is mapped, obtain a fresh X server timestamp and present with it.
+  // This brings the launched task list forward without keeping it always-on-top.
+#ifdef GDK_WINDOWING_X11
+  GdkWindow* gdk_window = gtk_widget_get_window(toplevel);
+  if (gdk_window != nullptr && GDK_IS_X11_WINDOW(gdk_window)) {
+    gtk_window_present_with_time(GTK_WINDOW(toplevel),
+                                 gdk_x11_get_server_time(gdk_window));
+    return;
+  }
+#endif
+  gtk_window_present(GTK_WINDOW(toplevel));
 }
 
 // Implements GApplication::activate.
