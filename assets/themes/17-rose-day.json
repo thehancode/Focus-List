@@ -1,0 +1,13 @@
+{
+  "id": "rose-day",
+  "name": "Rosé Day",
+  "background": "#fff5fa",
+  "panel": "#ffe4f0",
+  "text": "#4b263b",
+  "muted": "#946279",
+  "accent": "#d94f8a",
+  "pending": "#b96a00",
+  "doing": "#4969bf",
+  "done": "#248453",
+  "error": "#c43d62"
+}

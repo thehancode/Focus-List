@@ -1,0 +1,13 @@
+{
+  "id": "oxocarbon",
+  "name": "Oxocarbon",
+  "background": "#161616",
+  "panel": "#262626",
+  "text": "#f2f4f8",
+  "muted": "#a2a9b0",
+  "accent": "#78a9ff",
+  "pending": "#f1c21b",
+  "doing": "#08bdba",
+  "done": "#42be65",
+  "error": "#fa4d56"
+}

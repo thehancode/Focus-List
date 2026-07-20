@@ -1,0 +1,13 @@
+{
+  "id": "oxocarbon-light",
+  "name": "Oxocarbon Light",
+  "background": "#f2f4f8",
+  "panel": "#dde1e6",
+  "text": "#161616",
+  "muted": "#697077",
+  "accent": "#0f62fe",
+  "pending": "#b28600",
+  "doing": "#007d79",
+  "done": "#198038",
+  "error": "#da1e28"
+}

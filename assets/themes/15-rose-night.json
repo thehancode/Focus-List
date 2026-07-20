@@ -1,0 +1,13 @@
+{
+  "id": "rose-night",
+  "name": "Rosé Night",
+  "background": "#21141f",
+  "panel": "#352033",
+  "text": "#ffe9f3",
+  "muted": "#c69bad",
+  "accent": "#ff8fbd",
+  "pending": "#ffc56e",
+  "doing": "#a9b8ff",
+  "done": "#9ee6bd",
+  "error": "#ff8ca8"
+}
