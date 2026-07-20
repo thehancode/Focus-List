@@ -407,6 +407,18 @@ void main() {
       ).extension<TerminalPalette>()!.theme.id,
       'gruvbox',
     );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyW);
+    await tester.pumpAndSettle();
+    expect(find.text('●'), findsOneWidget);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyW);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('▲'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 

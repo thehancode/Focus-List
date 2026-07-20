@@ -143,6 +143,14 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       unawaited(_showThemePicker());
       return KeyEventResult.handled;
     }
+    if (usesTerminalPresentation &&
+        event is KeyDownEvent &&
+        key == LogicalKeyboardKey.keyW) {
+      unawaited(
+        vm.cycleSelectedTag(HardwareKeyboard.instance.isShiftPressed ? 1 : 0),
+      );
+      return KeyEventResult.handled;
+    }
     if (_grabbed) {
       if (key == LogicalKeyboardKey.keyF) unawaited(vm.advanceSelectedTask());
       _releaseGrab();
@@ -1537,6 +1545,10 @@ class _Footer extends ConsumerWidget {
                   context: context,
                   builder: (_) => const _ThemePickerDialog(),
                 ),
+              ),
+              _TerminalCommand(
+                keys: 'w/shift+w',
+                label: AppLocalizations.of(context)!.commandTags,
               ),
               _TerminalCommand(
                 keys: 'ctrl+n',
