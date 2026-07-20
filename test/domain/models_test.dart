@@ -31,6 +31,71 @@ void main() {
     expect(list.validate, throwsFormatException);
   });
 
+  test('nested task fields round-trip with backward-compatible defaults', () {
+    final oldTask = Task.fromJson(_taskJson());
+    expect(oldTask.parentId, isNull);
+    expect(oldTask.collapsed, isFalse);
+
+    final nested = Task.fromJson({
+      ..._taskJson(),
+      'parent_id': 'parent',
+      'collapsed': true,
+    });
+    expect(nested.parentId, 'parent');
+    expect(nested.collapsed, isTrue);
+    expect(nested.toJson()['parent_id'], 'parent');
+    expect(nested.toJson()['collapsed'], isTrue);
+  });
+
+  test('task-list validates preorder, depth, cycles, and daily roots', () {
+    Task task(String id, {String? parentId, bool daily = false}) =>
+        Task.fromJson({
+          ..._taskJson(),
+          'id': id,
+          'parent_id': ?parentId,
+          if (daily) 'daily': true,
+        });
+    TaskList list(List<Task> tasks) => TaskList(
+      schemaVersion: currentSchemaVersion,
+      id: 'list',
+      name: 'Tasks',
+      createdAt: DateTime.utc(2026),
+      tasks: tasks,
+    );
+
+    expect(
+      () => list([
+        task('root'),
+        task('child', parentId: 'root'),
+        task('grandchild', parentId: 'child'),
+      ]).validate(),
+      returnsNormally,
+    );
+    expect(
+      () => list([
+        task('root'),
+        task('child', parentId: 'root'),
+        task('grandchild', parentId: 'child'),
+        task('too-deep', parentId: 'grandchild'),
+      ]).validate(),
+      throwsFormatException,
+    );
+    expect(
+      () => list([
+        task('root', parentId: 'child'),
+        task('child', parentId: 'root'),
+      ]).validate(),
+      throwsFormatException,
+    );
+    expect(
+      () => list([
+        task('root'),
+        task('child', parentId: 'root', daily: true),
+      ]).validate(),
+      throwsFormatException,
+    );
+  });
+
   test(
     'tag names have backward-compatible defaults and persist custom names',
     () {

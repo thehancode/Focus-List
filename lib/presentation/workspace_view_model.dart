@@ -124,20 +124,22 @@ extension WorkspaceStateQueries on WorkspaceState {
   }
 
   List<String> get visibleTaskIds => switch (view) {
-    WorkspaceView.list => _idsForStatuses(currentList, const [
-      TaskStatus.doing,
-      TaskStatus.pending,
-      TaskStatus.done,
-    ]),
-    WorkspaceView.focus => _idsForStatuses(currentList, const [
-      TaskStatus.doing,
-    ]),
-    WorkspaceView.completed => completionEntries(
+    WorkspaceView.list => visibleTreeTasks(
       currentList,
-    ).map((entry) => entry.task.id).toList(growable: false),
+    ).map((task) => task.id).toList(),
+    WorkspaceView.focus => visibleTreeTasks(
+      currentList,
+      rootStatuses: const {TaskStatus.doing},
+    ).map((task) => task.id).toList(),
+    WorkspaceView.completed => completedTreeRows(
+      currentList,
+    ).map((row) => row.task.id).toList(),
     WorkspaceView.multi => [
       for (final list in lists)
-        ..._idsForStatuses(list, const [TaskStatus.doing, TaskStatus.pending]),
+        ...visibleTreeTasks(
+          list,
+          rootStatuses: const {TaskStatus.doing, TaskStatus.pending},
+        ).map((task) => task.id),
     ],
   };
 
@@ -150,19 +152,90 @@ class CompletionEntry {
   final DateTime completedAt;
 }
 
-List<String> _idsForStatuses(TaskList? list, List<TaskStatus> statuses) =>
-    list == null
-    ? const []
-    : [
-        for (final status in statuses)
-          for (final task in list.tasks)
-            if (task.status == status) task.id,
-      ];
+class CompletionTreeRow {
+  const CompletionTreeRow(this.task, this.completedAt);
+  final Task task;
+  final DateTime? completedAt;
+}
+
+List<CompletionTreeRow> completedTreeRows(TaskList? list) {
+  if (list == null) return const [];
+  final rows = <CompletionTreeRow>[];
+  for (final entry in completionEntries(list)) {
+    final hiddenParents = <String>{};
+    for (final task in [entry.task, ...taskDescendants(list, entry.task)]) {
+      if (task.parentId != null && hiddenParents.contains(task.parentId)) {
+        hiddenParents.add(task.id);
+        continue;
+      }
+      rows.add(
+        CompletionTreeRow(
+          task,
+          task.id == entry.task.id ? entry.completedAt : null,
+        ),
+      );
+      if (task.collapsed) hiddenParents.add(task.id);
+    }
+  }
+  return rows;
+}
+
+List<Task> visibleTreeTasks(TaskList? list, {Set<TaskStatus>? rootStatuses}) {
+  if (list == null) return const [];
+  final result = <Task>[];
+  final hiddenParents = <String>{};
+  for (final task in list.tasks) {
+    final root = taskRoot(list, task);
+    if (rootStatuses != null && !rootStatuses.contains(root.status)) continue;
+    if (task.parentId != null && hiddenParents.contains(task.parentId)) {
+      hiddenParents.add(task.id);
+      continue;
+    }
+    result.add(task);
+    if (task.collapsed) hiddenParents.add(task.id);
+  }
+  return result;
+}
+
+Task taskRoot(TaskList list, Task task) {
+  var current = task;
+  while (current.parentId != null) {
+    current = list.tasks.firstWhere((item) => item.id == current.parentId);
+  }
+  return current;
+}
+
+int taskDepth(TaskList list, Task task) {
+  var depth = 0;
+  var current = task;
+  while (current.parentId != null) {
+    depth++;
+    current = list.tasks.firstWhere((item) => item.id == current.parentId);
+  }
+  return depth;
+}
+
+bool taskHasChildren(TaskList list, Task task) =>
+    list.tasks.any((candidate) => candidate.parentId == task.id);
+
+List<Task> taskDescendants(TaskList list, Task task) {
+  final descendantIds = <String>{task.id};
+  final result = <Task>[];
+  for (final candidate in list.tasks) {
+    if (candidate.parentId != null &&
+        descendantIds.contains(candidate.parentId)) {
+      descendantIds.add(candidate.id);
+      result.add(candidate);
+    }
+  }
+  return result;
+}
 
 List<CompletionEntry> completionEntries(TaskList? list) {
   if (list == null) return const [];
   final entries = <CompletionEntry>[];
   for (final task in list.tasks) {
+    if (task.parentId != null) continue;
     if (task.daily) {
       entries.addAll(
         task.completionHistory.map((time) => CompletionEntry(task, time)),
@@ -242,21 +315,28 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final updated = <TaskList>[];
     for (final list in lists) {
       var changed = false;
-      final tasks = list.tasks
-          .map((task) {
-            if (task.daily &&
-                task.status != TaskStatus.pending &&
-                !isSameLocalDay(task.updatedAt, now)) {
-              changed = true;
-              return task.copyWith(
-                status: TaskStatus.pending,
-                updatedAt: now,
-                clearCompletedAt: true,
-              );
-            }
-            return task;
-          })
-          .toList(growable: false);
+      final resetIds = <String>{};
+      for (final task in list.tasks) {
+        if (task.parentId == null &&
+            task.daily &&
+            task.status != TaskStatus.pending &&
+            !isSameLocalDay(task.updatedAt, now)) {
+          resetIds.add(task.id);
+          resetIds.addAll(taskDescendants(list, task).map((item) => item.id));
+        }
+      }
+      final tasks = [
+        for (final task in list.tasks)
+          if (resetIds.contains(task.id))
+            task.copyWith(
+              status: TaskStatus.pending,
+              updatedAt: now,
+              clearCompletedAt: true,
+            )
+          else
+            task,
+      ];
+      changed = resetIds.isNotEmpty;
       final next = changed ? list.copyWith(tasks: tasks) : list;
       if (changed) await _lists.save(next);
       updated.add(next);
@@ -296,7 +376,12 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     tasks: const [],
   );
 
-  Task _newTask(String title, bool daily, {List<TaskTag> tags = const []}) {
+  Task _newTask(
+    String title,
+    bool daily, {
+    List<TaskTag> tags = const [],
+    String? parentId,
+  }) {
     final now = DateTime.now().toUtc();
     return Task(
       id: _uuid.v4(),
@@ -308,6 +393,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       daily: daily,
       completionHistory: const [],
       tags: tags,
+      parentId: parentId,
     );
   }
 
@@ -379,7 +465,9 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     }
     final current = state.currentList;
     if (current == null ||
-        !current.tasks.any((task) => task.status == TaskStatus.doing)) {
+        !current.tasks.any(
+          (task) => task.parentId == null && task.status == TaskStatus.doing,
+        )) {
       _showNotice(const NoticeState('No Doing tasks to focus'));
       return;
     }
@@ -486,6 +574,50 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     );
   }
 
+  Future<bool> createSubtask(String input) async {
+    final title = normalizeName(input);
+    if (title.isEmpty) return _error('A name cannot be empty');
+    final list = state.selectedTaskList;
+    final parent = state.selectedTask;
+    if (list == null || parent == null) return false;
+    if (taskDepth(list, parent) + 1 >= maxTaskDepth) {
+      return _error('Tasks can only be nested three levels deep');
+    }
+    if (parent.status == TaskStatus.done) {
+      return _error('Completed tasks cannot receive subtasks');
+    }
+    final task = _newTask(title, false, parentId: parent.id);
+    final parentIndex = list.tasks.indexWhere((item) => item.id == parent.id);
+    final tasks = list.tasks.toList(growable: true)
+      ..insert(parentIndex + 1, task);
+    return _saveList(
+      list.copyWith(tasks: tasks),
+      success: 'Subtask added',
+      selectedTaskId: task.id,
+    );
+  }
+
+  Future<bool> toggleSelectedCollapsed() async {
+    final list = state.selectedTaskList;
+    final selected = state.selectedTask;
+    if (list == null || selected == null || !taskHasChildren(list, selected)) {
+      return _error('Selected task has no subtasks');
+    }
+    return _saveList(
+      list.copyWith(
+        tasks: [
+          for (final task in list.tasks)
+            if (task.id == selected.id)
+              task.copyWith(collapsed: !task.collapsed)
+            else
+              task,
+        ],
+      ),
+      success: selected.collapsed ? 'Subtasks expanded' : 'Subtasks collapsed',
+      selectedTaskId: selected.id,
+    );
+  }
+
   Future<bool> updateSelectedTask(String input, bool daily) async {
     final title = normalizeName(input);
     if (title.isEmpty) return _error('A name cannot be empty');
@@ -498,7 +630,11 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         tasks: [
           for (final task in list.tasks)
             if (task.id == id)
-              task.copyWith(title: title, daily: daily, updatedAt: now)
+              task.copyWith(
+                title: title,
+                daily: task.parentId == null ? daily : false,
+                updatedAt: now,
+              )
             else
               task,
         ],
@@ -513,9 +649,19 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final list = state.selectedTaskList;
     final selected = state.selectedTask;
     if (list == null || selected == null) return false;
-    final task = _newTask(title, daily, tags: selected.tags);
+    if (taskHasChildren(list, selected)) {
+      return _error('Tasks with subtasks cannot be duplicated');
+    }
+    final task = _newTask(
+      title,
+      selected.parentId == null ? daily : false,
+      tags: selected.tags,
+      parentId: selected.parentId,
+    );
+    final index = list.tasks.indexWhere((item) => item.id == selected.id);
+    final tasks = list.tasks.toList(growable: true)..insert(index + 1, task);
     return _saveList(
-      list.copyWith(tasks: [...list.tasks, task]),
+      list.copyWith(tasks: tasks),
       success: 'Task duplicated',
       selectedTaskId: task.id,
     );
@@ -525,8 +671,17 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final list = state.selectedTaskList;
     final id = state.selectedTaskId;
     if (list == null || id == null) return false;
+    final selected = state.selectedTask!;
+    final removedIds = {
+      id,
+      ...taskDescendants(list, selected).map((task) => task.id),
+    };
     final result = await _saveList(
-      list.copyWith(tasks: list.tasks.where((task) => task.id != id).toList()),
+      list.copyWith(
+        tasks: list.tasks
+            .where((task) => !removedIds.contains(task.id))
+            .toList(),
+      ),
       success: 'Task deleted',
     );
     if (result) {
@@ -586,47 +741,70 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final list = state.selectedTaskList;
     final selected = state.selectedTask;
     if (list == null || selected == null) return false;
-    final fromMulti = state.view == WorkspaceView.multi;
     final now = DateTime.now().toUtc();
     final to = selected.status.next;
-    var history = selected.completionHistory.toList(growable: true);
-    if (to == TaskStatus.done && selected.daily) history.add(now);
-    if (to == TaskStatus.pending && selected.daily) {
-      history = history
-          .where((entry) => !isSameLocalDay(entry, now))
-          .toList(growable: true);
+    if (selected.parentId != null && selected.status == TaskStatus.done) {
+      return _error(
+        'Completed subtasks are restored with their top-level task',
+      );
     }
-    final updated = selected.copyWith(
-      status: to,
-      updatedAt: now,
-      completedAt: to == TaskStatus.done ? now : null,
-      clearCompletedAt: to != TaskStatus.done,
-      completionHistory: history,
-    );
+    final root = taskRoot(list, selected);
+    final cascadeIds = <String>{selected.id};
+    if (to == TaskStatus.done ||
+        (selected.parentId == null && to == TaskStatus.pending)) {
+      cascadeIds.addAll(taskDescendants(list, selected).map((task) => task.id));
+    }
+    Task withStatus(Task task, TaskStatus status) {
+      var history = task.completionHistory.toList(growable: true);
+      if (task.daily && status == TaskStatus.done) history.add(now);
+      if (task.daily && status == TaskStatus.pending) {
+        history = history
+            .where((entry) => !isSameLocalDay(entry, now))
+            .toList(growable: false);
+      }
+      return task.copyWith(
+        status: status,
+        updatedAt: now,
+        completedAt: status == TaskStatus.done ? now : null,
+        clearCompletedAt: status != TaskStatus.done,
+        completionHistory: history,
+      );
+    }
+
+    final tasks = [
+      for (final task in list.tasks)
+        if (cascadeIds.contains(task.id))
+          withStatus(task, to)
+        else if (to == TaskStatus.doing && task.id == root.id)
+          withStatus(task, TaskStatus.doing)
+        else
+          task,
+    ];
+    final fromMulti = state.view == WorkspaceView.multi;
     var view = state.view;
     var returnToMulti = state.returnToMultiAfterFocus;
     if (to == TaskStatus.doing) {
       view = WorkspaceView.focus;
       returnToMulti = fromMulti;
-    } else if (selected.status == TaskStatus.doing &&
+    } else if (selected.parentId == null &&
+        selected.status == TaskStatus.doing &&
         to == TaskStatus.done &&
         (returnToMulti || fromMulti)) {
       view = WorkspaceView.multi;
       returnToMulti = false;
-    } else if (selected.status == TaskStatus.doing &&
+    } else if (selected.parentId == null &&
+        selected.status == TaskStatus.doing &&
         to == TaskStatus.done &&
         !list.tasks.any(
-          (task) => task.id != selected.id && task.status == TaskStatus.doing,
+          (task) =>
+              task.parentId == null &&
+              task.id != root.id &&
+              task.status == TaskStatus.doing,
         )) {
       view = WorkspaceView.list;
     }
     final success = await _saveList(
-      list.copyWith(
-        tasks: [
-          for (final task in list.tasks)
-            if (task.id == selected.id) updated else task,
-        ],
-      ),
+      list.copyWith(tasks: tasks),
       success: '${selected.status.label} → ${to.label}',
       view: view,
       returnToMultiAfterFocus: returnToMulti,
@@ -641,25 +819,38 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
   Future<bool> revertSelectedCompletedTask() async {
     final list = state.selectedTaskList;
     final task = state.selectedTask;
-    if (list == null || task == null || task.status != TaskStatus.done) {
+    if (list == null ||
+        task == null ||
+        task.parentId != null ||
+        task.status != TaskStatus.done) {
       return false;
     }
+    final now = DateTime.now().toUtc();
+    final resetIds = {
+      task.id,
+      ...taskDescendants(list, task).map((item) => item.id),
+    };
     return _saveList(
       list.copyWith(
         tasks: [
           for (final candidate in list.tasks)
-            if (candidate.id == task.id)
+            if (resetIds.contains(candidate.id))
               candidate.copyWith(
-                status: TaskStatus.doing,
-                updatedAt: DateTime.now().toUtc(),
+                status: TaskStatus.pending,
+                updatedAt: now,
                 clearCompletedAt: true,
+                completionHistory: candidate.daily
+                    ? candidate.completionHistory
+                          .where((entry) => !isSameLocalDay(entry, now))
+                          .toList(growable: false)
+                    : candidate.completionHistory,
               )
             else
               candidate,
         ],
       ),
-      success: 'Done → Doing',
-      view: WorkspaceView.focus,
+      success: 'Done → Pending',
+      view: WorkspaceView.list,
       animationTaskId: task.id,
     );
   }
@@ -669,20 +860,34 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final list = state.selectedTaskList;
     final selected = state.selectedTask;
     if (list == null || selected == null) return false;
-    final positions = <int>[];
-    for (var index = 0; index < list.tasks.length; index++) {
-      if (list.tasks[index].status == selected.status) positions.add(index);
-    }
-    final current = positions.indexWhere(
-      (index) => list.tasks[index].id == selected.id,
-    );
+    final siblings = list.tasks
+        .where(
+          (task) =>
+              task.parentId == selected.parentId &&
+              (selected.parentId != null || task.status == selected.status),
+        )
+        .toList(growable: false);
+    final current = siblings.indexWhere((task) => task.id == selected.id);
     if (current < 0) return false;
-    final target = (current + direction).clamp(0, positions.length - 1).toInt();
+    final target = (current + direction).clamp(0, siblings.length - 1).toInt();
     if (target == current) return false;
     final tasks = list.tasks.toList(growable: true);
-    final held = tasks[positions[current]];
-    tasks[positions[current]] = tasks[positions[target]];
-    tasks[positions[target]] = held;
+    List<Task> subtree(Task root) => [root, ...taskDescendants(list, root)];
+    final selectedBlock = subtree(selected);
+    final targetTask = siblings[target];
+    final targetBlock = subtree(targetTask);
+    final firstBlock = direction < 0 ? targetBlock : selectedBlock;
+    final secondBlock = direction < 0 ? selectedBlock : targetBlock;
+    final start = tasks.indexWhere((task) => task.id == firstBlock.first.id);
+    final secondStart = tasks.indexWhere(
+      (task) => task.id == secondBlock.first.id,
+    );
+    final middle = tasks.sublist(start + firstBlock.length, secondStart);
+    tasks.replaceRange(start, secondStart + secondBlock.length, [
+      ...secondBlock,
+      ...middle,
+      ...firstBlock,
+    ]);
     return _saveList(list.copyWith(tasks: tasks), success: 'Task reordered');
   }
 

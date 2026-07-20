@@ -426,6 +426,63 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('terminal nested rows indent and H persists collapsed children', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final now = DateTime.utc(2026, 1, 1);
+    final root = Task(
+      id: 'root',
+      title: 'Root',
+      status: TaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+    );
+    final child = Task(
+      id: 'child',
+      title: 'Child',
+      status: TaskStatus.pending,
+      createdAt: root.createdAt,
+      updatedAt: root.updatedAt,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+      parentId: 'root',
+    );
+    final repository = _Lists([
+      TaskList(
+        schemaVersion: currentSchemaVersion,
+        id: 'list',
+        name: 'Tasks',
+        createdAt: root.createdAt,
+        tasks: [root, child],
+      ),
+    ]);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskListRepositoryProvider.overrideWithValue(repository),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    expect(
+      tester.getTopLeft(find.text('Child')).dx,
+      greaterThan(tester.getTopLeft(find.text('Root')).dx),
+    );
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyH);
+    await tester.pumpAndSettle();
+    expect(find.text('Child'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('selected terminal tags fill the wrapped task row', (
     tester,
   ) async {

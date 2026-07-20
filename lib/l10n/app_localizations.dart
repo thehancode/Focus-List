@@ -154,6 +154,24 @@ abstract class AppLocalizations {
   /// **'New task'**
   String get newTask;
 
+  /// Action and dialog title for creating a nested task.
+  ///
+  /// In en, this message translates to:
+  /// **'New subtask'**
+  String get newSubtask;
+
+  /// Task-menu action that hides descendants.
+  ///
+  /// In en, this message translates to:
+  /// **'Collapse subtasks'**
+  String get collapseSubtasks;
+
+  /// Task-menu action that reveals descendants.
+  ///
+  /// In en, this message translates to:
+  /// **'Expand subtasks'**
+  String get expandSubtasks;
+
   /// Task editor dialog title.
   ///
   /// In en, this message translates to:
@@ -187,7 +205,7 @@ abstract class AppLocalizations {
   /// Warning in the task-deletion confirmation.
   ///
   /// In en, this message translates to:
-  /// **'This cannot be undone.'**
+  /// **'This task and all its subtasks will be deleted. This cannot be undone.'**
   String get deleteTaskBody;
 
   /// Delete-list confirmation; listName is user-created text.
@@ -205,7 +223,7 @@ abstract class AppLocalizations {
   /// Multiline desktop shortcut reference. Keep key glyphs and line breaks.
   ///
   /// In en, this message translates to:
-  /// **'↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder in status\nN / E / D / X   New, edit, duplicate, delete task\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
+  /// **'↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder task/subtree\nN / A / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
   String get keyboardShortcutsHelp;
 
   /// Fallback workspace loading error.
@@ -367,7 +385,7 @@ abstract class AppLocalizations {
   /// Task menu action that moves a completed task to Doing.
   ///
   /// In en, this message translates to:
-  /// **'Reopen in Doing'**
+  /// **'Restore to Pending'**
   String get reopenInDoing;
 
   /// Short task menu action.

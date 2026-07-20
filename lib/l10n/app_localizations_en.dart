@@ -36,6 +36,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newTask => 'New task';
 
   @override
+  String get newSubtask => 'New subtask';
+
+  @override
+  String get collapseSubtasks => 'Collapse subtasks';
+
+  @override
+  String get expandSubtasks => 'Expand subtasks';
+
+  @override
   String get editTask => 'Edit task';
 
   @override
@@ -51,7 +60,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get deleteList => 'Delete list';
 
   @override
-  String get deleteTaskBody => 'This cannot be undone.';
+  String get deleteTaskBody =>
+      'This task and all its subtasks will be deleted. This cannot be undone.';
 
   @override
   String deleteListBody(Object listName) {
@@ -63,7 +73,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyboardShortcutsHelp =>
-      '↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder in status\nN / E / D / X   New, edit, duplicate, delete task\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit';
+      '↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder task/subtree\nN / A / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit';
 
   @override
   String get couldNotLoad => 'Could not load Focus List';
@@ -151,7 +161,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get taskActions => 'Task actions';
 
   @override
-  String get reopenInDoing => 'Reopen in Doing';
+  String get reopenInDoing => 'Restore to Pending';
 
   @override
   String get edit => 'Edit';

@@ -161,6 +161,10 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       unawaited(_showListEditor(rename: true));
     } else if (key == LogicalKeyboardKey.keyN) {
       unawaited(_showTaskEditor());
+    } else if (key == LogicalKeyboardKey.keyA) {
+      unawaited(_showTaskEditor(subtask: true));
+    } else if (key == LogicalKeyboardKey.keyH) {
+      unawaited(vm.toggleSelectedCollapsed());
     } else if (key == LogicalKeyboardKey.keyE) {
       unawaited(_showTaskEditor(edit: true));
     } else if (key == LogicalKeyboardKey.keyD) {
@@ -190,11 +194,18 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
   Future<void> _showTaskEditor({
     bool edit = false,
     bool duplicate = false,
+    bool subtask = false,
   }) async {
     final state = ref.read(workspaceViewModelProvider);
     final strings = AppLocalizations.of(context)!;
     final selected = state.selectedTask;
-    if ((edit || duplicate) && selected == null) return;
+    if ((edit || duplicate || subtask) && selected == null) return;
+    final selectedList = state.selectedTaskList;
+    if (duplicate &&
+        selectedList != null &&
+        taskHasChildren(selectedList, selected!)) {
+      return;
+    }
     final result = await showDialog<_TaskDraft>(
       context: context,
       builder: (_) => _TaskEditorDialog(
@@ -202,9 +213,13 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
             ? strings.editTask
             : duplicate
             ? strings.duplicateTask
+            : subtask
+            ? strings.newSubtask
             : strings.newTask,
         initialTitle: selected?.title ?? '',
-        initialDaily: selected?.daily ?? false,
+        initialDaily: subtask ? false : selected?.daily ?? false,
+        allowDaily:
+            !subtask && (!edit && !duplicate || selected?.parentId == null),
       ),
     );
     if (result == null) return;
@@ -213,6 +228,8 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       await vm.updateSelectedTask(result.title, result.daily);
     } else if (duplicate) {
       await vm.duplicateSelectedTask(result.title, result.daily);
+    } else if (subtask) {
+      await vm.createSubtask(result.title);
     } else {
       await vm.createTask(result.title, result.daily);
     }
@@ -646,11 +663,11 @@ class _ListContent extends StatelessWidget {
           state: state,
           title: _statusLabel(status, AppLocalizations.of(context)!),
           status: status,
-          tasks:
-              state.currentList?.tasks
-                  .where((task) => task.status == status)
-                  .toList() ??
-              const [],
+          tasks: visibleTreeTasks(state.currentList)
+              .where(
+                (task) => taskRoot(state.currentList!, task).status == status,
+              )
+              .toList(),
         ),
     ],
   );
@@ -662,11 +679,10 @@ class _FocusContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tasks =
-        state.currentList?.tasks
-            .where((task) => task.status == TaskStatus.doing)
-            .toList() ??
-        const [];
+    final tasks = visibleTreeTasks(
+      state.currentList,
+      rootStatuses: const {TaskStatus.doing},
+    );
     return _TaskScrollView(
       key: const ValueKey('task-scroll-focus'),
       indicatorColor: _cyan,
@@ -688,8 +704,8 @@ class _CompletedContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final entries = state.completedEntries;
-    if (entries.isEmpty) {
+    final rows = completedTreeRows(state.currentList);
+    if (rows.isEmpty) {
       return _EmptyState(AppLocalizations.of(context)!.noCompletedTasks);
     }
     return _TaskScrollView(
@@ -699,12 +715,8 @@ class _CompletedContent extends StatelessWidget {
           ? TerminalMetrics.panelPadding(context)
           : const EdgeInsets.all(12),
       children: [
-        for (final entry in entries)
-          _TaskRow(
-            task: entry.task,
-            state: state,
-            completedAt: entry.completedAt,
-          ),
+        for (final row in rows)
+          _TaskRow(task: row.task, state: state, completedAt: row.completedAt),
       ],
     );
   }
@@ -718,9 +730,10 @@ class _MultiContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final children = <Widget>[];
     for (final list in state.lists) {
-      final visible = list.tasks
-          .where((task) => task.status != TaskStatus.done)
-          .toList();
+      final visible = visibleTreeTasks(
+        list,
+        rootStatuses: const {TaskStatus.doing, TaskStatus.pending},
+      );
       if (visible.isEmpty) continue;
       children.add(
         Padding(
@@ -735,7 +748,9 @@ class _MultiContent extends StatelessWidget {
         ),
       );
       for (final status in const [TaskStatus.doing, TaskStatus.pending]) {
-        final tasks = visible.where((task) => task.status == status).toList();
+        final tasks = visible
+            .where((task) => taskRoot(list, task).status == status)
+            .toList();
         if (tasks.isNotEmpty) {
           children.add(
             _TaskSection(
@@ -964,7 +979,7 @@ class _TaskSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${_statusIcon(status)} $title (${tasks.length})',
+            '${_statusIcon(status)} $title (${tasks.where((task) => task.parentId == null).length})',
             style: TextStyle(
               color: _statusColor(status),
               fontWeight: FontWeight.bold,
@@ -1001,6 +1016,11 @@ class _TaskRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final terminal = usesTerminalPresentation;
+    final list = state.lists.firstWhere(
+      (candidate) => candidate.tasks.any((item) => item.id == task.id),
+    );
+    final depth = taskDepth(list, task);
+    final hasChildren = taskHasChildren(list, task);
     final selected = task.id == state.selectedTaskId;
     final visibleTaskIds = selected ? state.visibleTaskIds : const <String>[];
     final done = task.status == TaskStatus.done;
@@ -1045,7 +1065,7 @@ class _TaskRow extends ConsumerWidget {
           padding: EdgeInsets.symmetric(
             horizontal: terminal ? 0 : 8,
             vertical: terminal ? 1 : 9,
-          ),
+          ).add(EdgeInsets.only(left: terminal ? 0 : depth * 16.0)),
           decoration: BoxDecoration(
             color: animated
                 ? _statusColor(task.status)
@@ -1062,7 +1082,7 @@ class _TaskRow extends ConsumerWidget {
           child: Row(
             children: [
               Text(
-                selected ? '› ' : '- ',
+                '${terminal ? '  ' * depth : ''}${hasChildren ? (task.collapsed ? '▸ ' : '▾ ') : (selected ? '› ' : '- ')}',
                 style: TextStyle(
                   color: selected ? const Color(0xff0d0f18) : _muted,
                   fontWeight: FontWeight.bold,
@@ -1094,7 +1114,9 @@ class _TaskRow extends ConsumerWidget {
                     ),
                   ),
                 ),
-              if (completedAt == null && !terminal)
+              if (completedAt == null &&
+                  !terminal &&
+                  !(task.parentId != null && task.status == TaskStatus.done))
                 IconButton(
                   tooltip: AppLocalizations.of(context)!.advanceTask,
                   color: selected
@@ -1122,21 +1144,37 @@ class _TaskRow extends ConsumerWidget {
                   onSelected: (action) =>
                       _handleTaskAction(context, ref, task, action),
                   itemBuilder: (_) => [
-                    if (task.status == TaskStatus.done)
+                    if (task.parentId == null && task.status == TaskStatus.done)
                       PopupMenuItem(
                         value: 'revert',
                         child: Text(
                           AppLocalizations.of(context)!.reopenInDoing,
                         ),
                       ),
+                    if (task.status != TaskStatus.done &&
+                        depth + 1 < maxTaskDepth)
+                      PopupMenuItem(
+                        value: 'subtask',
+                        child: Text(AppLocalizations.of(context)!.newSubtask),
+                      ),
+                    if (hasChildren)
+                      PopupMenuItem(
+                        value: 'collapse',
+                        child: Text(
+                          task.collapsed
+                              ? AppLocalizations.of(context)!.expandSubtasks
+                              : AppLocalizations.of(context)!.collapseSubtasks,
+                        ),
+                      ),
                     PopupMenuItem(
                       value: 'edit',
                       child: Text(AppLocalizations.of(context)!.edit),
                     ),
-                    PopupMenuItem(
-                      value: 'duplicate',
-                      child: Text(AppLocalizations.of(context)!.duplicate),
-                    ),
+                    if (!hasChildren)
+                      PopupMenuItem(
+                        value: 'duplicate',
+                        child: Text(AppLocalizations.of(context)!.duplicate),
+                      ),
                     PopupMenuItem(
                       value: 'delete',
                       child: Text(AppLocalizations.of(context)!.delete),
@@ -1539,10 +1577,12 @@ class _TaskEditorDialog extends StatefulWidget {
     required this.title,
     required this.initialTitle,
     required this.initialDaily,
+    this.allowDaily = true,
   });
   final String title;
   final String initialTitle;
   final bool initialDaily;
+  final bool allowDaily;
   @override
   State<_TaskEditorDialog> createState() => _TaskEditorDialogState();
 }
@@ -1570,6 +1610,7 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
       actions: {
         _ToggleDailyIntent: CallbackAction<_ToggleDailyIntent>(
           onInvoke: (_) {
+            if (!widget.allowDaily) return null;
             setState(() => _daily = !_daily);
             return null;
           },
@@ -1604,13 +1645,13 @@ class _TaskEditorDialogState extends State<_TaskEditorDialog> {
                   labelText: AppLocalizations.of(context)!.taskTitle,
                 ),
               ),
-              if (usesTerminalPresentation)
+              if (widget.allowDaily && usesTerminalPresentation)
                 _TerminalToggle(
                   value: _daily,
                   label: AppLocalizations.of(context)!.dailyTask,
                   onChanged: (value) => setState(() => _daily = value),
                 )
-              else
+              else if (widget.allowDaily)
                 SwitchListTile(
                   value: _daily,
                   onChanged: (value) => setState(() => _daily = value),
@@ -2025,6 +2066,10 @@ Future<void> _handleTaskAction(
 ) async {
   final vm = ref.read(workspaceViewModelProvider.notifier);
   vm.selectTask(task.id);
+  if (action == 'collapse') {
+    await vm.toggleSelectedCollapsed();
+    return;
+  }
   if (action == 'revert') {
     await vm.revertSelectedCompletedTask();
     return;
@@ -2062,14 +2107,19 @@ Future<void> _handleTaskAction(
     builder: (_) => _TaskEditorDialog(
       title: action == 'edit'
           ? AppLocalizations.of(context)!.editTask
+          : action == 'subtask'
+          ? AppLocalizations.of(context)!.newSubtask
           : AppLocalizations.of(context)!.duplicateTask,
-      initialTitle: task.title,
-      initialDaily: task.daily,
+      initialTitle: action == 'subtask' ? '' : task.title,
+      initialDaily: action == 'subtask' ? false : task.daily,
+      allowDaily: action != 'subtask' && task.parentId == null,
     ),
   );
   if (draft == null) return;
   if (action == 'edit') {
     await vm.updateSelectedTask(draft.title, draft.daily);
+  } else if (action == 'subtask') {
+    await vm.createSubtask(draft.title);
   } else {
     await vm.createTask(draft.title, draft.daily);
   }

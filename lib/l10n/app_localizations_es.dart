@@ -36,6 +36,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get newTask => 'Nueva tarea';
 
   @override
+  String get newSubtask => 'Nueva subtarea';
+
+  @override
+  String get collapseSubtasks => 'Ocultar subtareas';
+
+  @override
+  String get expandSubtasks => 'Mostrar subtareas';
+
+  @override
   String get editTask => 'Editar tarea';
 
   @override
@@ -51,7 +60,8 @@ class AppLocalizationsEs extends AppLocalizations {
   String get deleteList => 'Eliminar lista';
 
   @override
-  String get deleteTaskBody => 'Esta acción no se puede deshacer.';
+  String get deleteTaskBody =>
+      'Se eliminarán esta tarea y todas sus subtareas. Esta acción no se puede deshacer.';
 
   @override
   String deleteListBody(Object listName) {
@@ -151,7 +161,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get taskActions => 'Tarea';
 
   @override
-  String get reopenInDoing => 'Reabrir';
+  String get reopenInDoing => 'Restaurar pendiente';
 
   @override
   String get edit => 'Editar';
@@ -288,6 +298,15 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get newTask => 'Nueva tarea';
 
   @override
+  String get newSubtask => 'Nueva subtarea';
+
+  @override
+  String get collapseSubtasks => 'Ocultar subtareas';
+
+  @override
+  String get expandSubtasks => 'Mostrar subtareas';
+
+  @override
   String get editTask => 'Editar tarea';
 
   @override
@@ -303,7 +322,8 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get deleteList => 'Eliminar lista';
 
   @override
-  String get deleteTaskBody => 'Esta acción no se puede deshacer.';
+  String get deleteTaskBody =>
+      'Se eliminarán esta tarea y todas sus subtareas. Esta acción no se puede deshacer.';
 
   @override
   String deleteListBody(Object listName) {
@@ -403,7 +423,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get taskActions => 'Tarea';
 
   @override
-  String get reopenInDoing => 'Reabrir';
+  String get reopenInDoing => 'Restaurar pendiente';
 
   @override
   String get edit => 'Editar';
@@ -540,6 +560,15 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String get newTask => 'Nueva tarea';
 
   @override
+  String get newSubtask => 'Nueva subtarea';
+
+  @override
+  String get collapseSubtasks => 'Ocultar subtareas';
+
+  @override
+  String get expandSubtasks => 'Mostrar subtareas';
+
+  @override
   String get editTask => 'Editar tarea';
 
   @override
@@ -555,7 +584,8 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String get deleteList => 'Eliminar lista';
 
   @override
-  String get deleteTaskBody => 'Esta acción no se puede deshacer.';
+  String get deleteTaskBody =>
+      'Se eliminarán esta tarea y todas sus subtareas. Esta acción no se puede deshacer.';
 
   @override
   String deleteListBody(Object listName) {
@@ -655,7 +685,7 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String get taskActions => 'Tarea';
 
   @override
-  String get reopenInDoing => 'Reabrir';
+  String get reopenInDoing => 'Restaurar pendiente';
 
   @override
   String get edit => 'Editar';

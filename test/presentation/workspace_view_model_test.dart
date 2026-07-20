@@ -124,6 +124,110 @@ void main() {
     await vm.duplicateSelectedTask('Copy', false);
     expect(repository.lists.single.tasks.last.tags, [TaskTag.heart]);
   });
+
+  test(
+    'subtasks insert in preorder, persist collapse, and enforce depth',
+    () async {
+      final list = _list('tasks', 'Tasks', [_task('root', 'Root')]);
+      final repository = _TaskLists([list]);
+      final container = _container([list], repository: repository);
+      addTearDown(container.dispose);
+      final vm = await _ready(container);
+
+      expect(await vm.createSubtask('Child'), isTrue);
+      final child = repository.lists.single.tasks[1];
+      expect(child.parentId, 'root');
+      expect(await vm.createSubtask('Grandchild'), isTrue);
+      final grandchild = repository.lists.single.tasks[2];
+      expect(grandchild.parentId, child.id);
+      expect(await vm.createSubtask('Too deep'), isFalse);
+
+      vm.selectTask('root');
+      expect(await vm.toggleSelectedCollapsed(), isTrue);
+      expect(repository.lists.single.tasks.first.collapsed, isTrue);
+      expect(container.read(workspaceViewModelProvider).visibleTaskIds, [
+        'root',
+      ]);
+
+      expect(await vm.deleteSelectedTask(), isTrue);
+      expect(repository.lists.single.tasks, isEmpty);
+    },
+  );
+
+  test(
+    'nested status changes focus root, cascade done, and lock reopening',
+    () async {
+      final list = _list('tasks', 'Tasks', [
+        _task('root', 'Root'),
+        _task('child', 'Child', parentId: 'root'),
+        _task('grandchild', 'Grandchild', parentId: 'child'),
+      ]);
+      final repository = _TaskLists([list]);
+      final container = _container([list], repository: repository);
+      addTearDown(container.dispose);
+      final vm = await _ready(container);
+
+      vm.selectTask('child');
+      await vm.advanceSelectedTask();
+      var saved = repository.lists.single;
+      expect(saved.tasks.first.status, TaskStatus.doing);
+      expect(saved.tasks[1].status, TaskStatus.doing);
+      expect(
+        container.read(workspaceViewModelProvider).view,
+        WorkspaceView.focus,
+      );
+
+      await vm.advanceSelectedTask();
+      saved = repository.lists.single;
+      expect(saved.tasks.first.status, TaskStatus.doing);
+      expect(saved.tasks[1].status, TaskStatus.done);
+      expect(saved.tasks[2].status, TaskStatus.done);
+      expect(await vm.advanceSelectedTask(), isFalse);
+
+      vm.selectTask('root');
+      await vm.advanceSelectedTask();
+      expect(
+        repository.lists.single.tasks.every(
+          (task) => task.status == TaskStatus.done,
+        ),
+        isTrue,
+      );
+      await vm.revertSelectedCompletedTask();
+      expect(
+        repository.lists.single.tasks.every(
+          (task) => task.status == TaskStatus.pending,
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'nested reorder swaps sibling subtrees without leaving the parent',
+    () async {
+      final list = _list('tasks', 'Tasks', [
+        _task('root', 'Root'),
+        _task('first', 'First', parentId: 'root'),
+        _task('grandchild', 'Grandchild', parentId: 'first'),
+        _task('second', 'Second', parentId: 'root', status: TaskStatus.doing),
+        _task('other-root', 'Other root'),
+      ]);
+      final repository = _TaskLists([list]);
+      final container = _container([list], repository: repository);
+      addTearDown(container.dispose);
+      final vm = await _ready(container);
+
+      vm.selectTask('second');
+      await vm.reorderSelected(-1);
+      expect(repository.lists.single.tasks.map((task) => task.id), [
+        'root',
+        'second',
+        'first',
+        'grandchild',
+        'other-root',
+      ]);
+    },
+  );
 }
 
 ProviderContainer _container(
@@ -163,17 +267,22 @@ TaskList _list(
   tasks: tasks,
 );
 
-Task _task(String id, String title, {TaskStatus status = TaskStatus.pending}) =>
-    Task(
-      id: id,
-      title: title,
-      status: status,
-      createdAt: DateTime.utc(2026, 1, 1),
-      updatedAt: DateTime.utc(2026, 1, 1),
-      completedAt: null,
-      daily: false,
-      completionHistory: const [],
-    );
+Task _task(
+  String id,
+  String title, {
+  TaskStatus status = TaskStatus.pending,
+  String? parentId,
+}) => Task(
+  id: id,
+  title: title,
+  status: status,
+  createdAt: DateTime.utc(2026, 1, 1),
+  updatedAt: DateTime.utc(2026, 1, 1),
+  completedAt: null,
+  daily: false,
+  completionHistory: const [],
+  parentId: parentId,
+);
 
 class _TaskLists implements TaskListRepository {
   _TaskLists(List<TaskList> source) : lists = List<TaskList>.from(source);

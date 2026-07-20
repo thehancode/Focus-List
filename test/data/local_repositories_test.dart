@@ -35,7 +35,45 @@ void main() {
     expect(settings.marqueeSpeedMs, defaultMarqueeSpeedMs);
     expect(store.settings, isNotNull);
   });
+
+  test('repository preserves nested task links and collapsed state', () async {
+    final store = _MemoryStore([
+      StoredDocument(
+        key: 'nested',
+        value: {
+          ..._listJson('nested', 'Nested', '2026-01-01T00:00:00Z'),
+          'tasks': [
+            _taskJson('root', collapsed: true),
+            _taskJson('child', parentId: 'root'),
+          ],
+        },
+      ),
+    ]);
+    final repository = LocalTaskListRepository(store);
+
+    final loaded = await repository.loadAll();
+    expect(loaded.lists.single.tasks.first.collapsed, isTrue);
+    expect(loaded.lists.single.tasks.last.parentId, 'root');
+    await repository.save(loaded.lists.single);
+    final tasks = store.documents['nested']!['tasks']! as List<Object?>;
+    expect((tasks.first as Map)['collapsed'], isTrue);
+    expect((tasks.last as Map)['parent_id'], 'root');
+  });
 }
+
+Map<String, Object?> _taskJson(
+  String id, {
+  String? parentId,
+  bool collapsed = false,
+}) => {
+  'id': id,
+  'title': id,
+  'status': 'pending',
+  'created_at': '2026-01-01T00:00:00Z',
+  'updated_at': '2026-01-01T00:00:00Z',
+  'parent_id': ?parentId,
+  if (collapsed) 'collapsed': true,
+};
 
 Map<String, Object?> _listJson(String id, String name, String createdAt) => {
   'schema_version': 1,

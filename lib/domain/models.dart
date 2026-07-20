@@ -78,6 +78,8 @@ class Task {
     required this.daily,
     required List<DateTime> completionHistory,
     List<TaskTag> tags = const [],
+    this.parentId,
+    this.collapsed = false,
   }) : completionHistory = UnmodifiableListView<DateTime>(completionHistory),
        tags = UnmodifiableListView<TaskTag>(tags);
 
@@ -90,6 +92,8 @@ class Task {
   final bool daily;
   final UnmodifiableListView<DateTime> completionHistory;
   final UnmodifiableListView<TaskTag> tags;
+  final String? parentId;
+  final bool collapsed;
 
   Task copyWith({
     String? title,
@@ -100,6 +104,9 @@ class Task {
     bool? daily,
     List<DateTime>? completionHistory,
     List<TaskTag>? tags,
+    String? parentId,
+    bool clearParentId = false,
+    bool? collapsed,
   }) => Task(
     id: id,
     title: title ?? this.title,
@@ -110,6 +117,8 @@ class Task {
     daily: daily ?? this.daily,
     completionHistory: completionHistory ?? this.completionHistory,
     tags: tags ?? this.tags,
+    parentId: clearParentId ? null : (parentId ?? this.parentId),
+    collapsed: collapsed ?? this.collapsed,
   );
 
   Map<String, Object?> toJson() => {
@@ -127,6 +136,8 @@ class Task {
           .toList(growable: false),
     if (tags.isNotEmpty)
       'tags': tags.map((tag) => tag.wireName).toList(growable: false),
+    if (parentId != null) 'parent_id': parentId,
+    if (collapsed) 'collapsed': true,
   };
 
   factory Task.fromJson(Map<String, Object?> json) {
@@ -148,6 +159,10 @@ class Task {
       tags: (json['tags'] as List<Object?>? ?? const <Object?>[])
           .map(TaskTagX.fromWireName)
           .toList(growable: false),
+      parentId: json['parent_id'] == null
+          ? null
+          : _string(json['parent_id'], 'task.parent_id'),
+      collapsed: json['collapsed'] as bool? ?? false,
     );
   }
 }
@@ -216,8 +231,61 @@ class TaskList {
     )) {
       throw const FormatException('Task tags must be unique known tags');
     }
+    final byId = <String, Task>{};
+    for (final task in tasks) {
+      if (byId.containsKey(task.id)) {
+        throw FormatException('Duplicate task id ${task.id}');
+      }
+      byId[task.id] = task;
+    }
+    final activeAncestors = <String>[];
+    for (var index = 0; index < tasks.length; index++) {
+      final task = tasks[index];
+      if (task.parentId == null) {
+        activeAncestors
+          ..clear()
+          ..add(task.id);
+      } else {
+        final activeParent = activeAncestors.indexOf(task.parentId!);
+        if (activeParent < 0) {
+          throw FormatException(
+            'Task ${task.id} is outside its parent subtree',
+          );
+        }
+        activeAncestors
+          ..removeRange(activeParent + 1, activeAncestors.length)
+          ..add(task.id);
+      }
+      var depth = 1;
+      var parentId = task.parentId;
+      final ancestors = <String>{task.id};
+      while (parentId != null) {
+        if (!ancestors.add(parentId)) {
+          throw FormatException(
+            'Task hierarchy contains a cycle at ${task.id}',
+          );
+        }
+        final parent = byId[parentId];
+        if (parent == null) {
+          throw FormatException('Task ${task.id} has missing parent $parentId');
+        }
+        if (tasks.indexOf(parent) >= index) {
+          throw FormatException('Task ${task.id} must follow its parent');
+        }
+        depth++;
+        if (depth > maxTaskDepth) {
+          throw FormatException('Task ${task.id} exceeds maximum depth');
+        }
+        parentId = parent.parentId;
+      }
+      if (task.daily && task.parentId != null) {
+        throw FormatException('Subtask ${task.id} cannot be daily');
+      }
+    }
   }
 }
+
+const int maxTaskDepth = 3;
 
 class TagNames {
   const TagNames({
