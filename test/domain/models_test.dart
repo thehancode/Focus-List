@@ -101,6 +101,7 @@ void main() {
     () {
       final defaults = AppSettings.fromJson(const {});
       expect(defaults.languageLocale, 'en');
+      expect(defaults.themeId, 'classic');
       expect(defaults.tagNames.nameFor(TaskTag.spade), 'Spade');
       expect(defaults.tagNames.nameFor(TaskTag.heart), 'Heart');
 
@@ -116,6 +117,11 @@ void main() {
       expect(settings.tagNames.nameFor(TaskTag.diamond), 'Waiting');
       expect((settings.toJson()['tag_names']! as Map)['heart'], 'Important');
       expect(settings.toJson()['language'], 'en');
+      expect(settings.toJson()['theme'], 'classic');
+
+      final themed = AppSettings.fromJson({'theme': 'gruvbox'});
+      expect(themed.themeId, 'gruvbox');
+      expect(themed.toJson()['theme'], 'gruvbox');
 
       final latinAmerican = AppSettings.fromJson({'language': 'es_419'});
       expect(latinAmerican.languageLocale, 'es_419');

@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app/focus_list_app.dart';
+import 'app/theme_catalog.dart';
 import 'app/ui_mode.dart';
 import 'app/window_position_persistence.dart';
 
@@ -18,6 +20,7 @@ bool get isDesktop =>
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  final themeCatalog = await ThemeCatalog.load(rootBundle);
 
   if (isDesktop) {
     await windowManager.ensureInitialized();
@@ -59,5 +62,10 @@ Future<void> main() async {
     });
   }
 
-  runApp(const ProviderScope(child: FocusListApp()));
+  runApp(
+    ProviderScope(
+      overrides: [themeCatalogProvider.overrideWithValue(themeCatalog)],
+      child: const FocusListApp(),
+    ),
+  );
 }

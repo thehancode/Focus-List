@@ -1,14 +1,31 @@
 import 'package:flutter/material.dart';
+import '../app/theme_catalog.dart';
 
-const terminalBackground = Color(0xff0d0f18);
-const terminalPanel = Color(0xff161926);
-const terminalText = Color(0xffdde0eb);
-const terminalMuted = Color(0xff767c94);
-const terminalViolet = Color(0xffb794f4);
-const terminalAmber = Color(0xfff9bf60);
-const terminalCyan = Color(0xff5dd3dc);
-const terminalGreen = Color(0xff7dcf91);
-const terminalRed = Color(0xfff4707a);
+class TerminalPalette extends ThemeExtension<TerminalPalette> {
+  const TerminalPalette(this.theme);
+  final AppThemeDefinition theme;
+
+  static TerminalPalette of(BuildContext context) =>
+      Theme.of(context).extension<TerminalPalette>()!;
+
+  Color get background => theme.background;
+  Color get panel => theme.panel;
+  Color get text => theme.text;
+  Color get muted => theme.muted;
+  Color get accent => theme.accent;
+  Color get pending => theme.pending;
+  Color get doing => theme.doing;
+  Color get done => theme.done;
+  Color get error => theme.error;
+
+  @override
+  TerminalPalette copyWith({AppThemeDefinition? theme}) =>
+      TerminalPalette(theme ?? this.theme);
+
+  @override
+  TerminalPalette lerp(TerminalPalette? other, double t) =>
+      t < .5 || other == null ? this : other;
+}
 
 /// Pixel equivalents of the Rust UI's character-cell layout.
 abstract final class TerminalMetrics {

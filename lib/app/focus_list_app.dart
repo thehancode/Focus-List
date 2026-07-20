@@ -3,28 +3,33 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../presentation/workspace_screen.dart';
 import '../presentation/workspace_view_model.dart';
+import '../presentation/terminal_style.dart';
 import '../l10n/app_localizations.dart';
 import 'ui_mode.dart';
+import 'theme_catalog.dart';
 
 class FocusListApp extends ConsumerWidget {
   const FocusListApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fontScale =
-        ref.watch(workspaceViewModelProvider).settings.nativeFontSize / 16;
+    final state = ref.watch(workspaceViewModelProvider);
+    final fontScale = state.settings.nativeFontSize / 16;
+    final palette = ref
+        .watch(themeCatalogProvider)
+        .byId(state.settings.themeId);
     final base = ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      scaffoldBackgroundColor: const Color(0xff0d0f18),
-      colorScheme: const ColorScheme.dark(
-        primary: Color(0xffb794f4),
-        secondary: Color(0xff5dd3dc),
-        surface: Color(0xff161926),
-        error: Color(0xfff4707a),
+      scaffoldBackgroundColor: palette.background,
+      colorScheme: ColorScheme.dark(
+        primary: palette.accent,
+        secondary: palette.doing,
+        surface: palette.panel,
+        error: palette.error,
       ),
       fontFamily: 'UbuntuMonoNerd',
-      dialogTheme: const DialogThemeData(backgroundColor: Color(0xff161926)),
+      dialogTheme: DialogThemeData(backgroundColor: palette.panel),
     );
     final terminal = usesTerminalPresentation;
     return MaterialApp(
@@ -41,27 +46,28 @@ class FocusListApp extends ConsumerWidget {
             : base.textTheme,
         visualDensity: terminal ? VisualDensity.compact : null,
         splashFactory: terminal ? NoSplash.splashFactory : null,
+        extensions: [TerminalPalette(palette)],
         dialogTheme: terminal
             ? DialogThemeData(
-                backgroundColor: const Color(0xff161926),
+                backgroundColor: palette.panel,
                 elevation: 0,
                 surfaceTintColor: Colors.transparent,
                 titleTextStyle: base.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xffb794f4),
+                  color: palette.accent,
                   fontWeight: FontWeight.bold,
                   height: 1,
                   leadingDistribution: TextLeadingDistribution.even,
                 ),
                 contentTextStyle: base.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xffdde0eb),
+                  color: palette.text,
                   height: 1,
                   leadingDistribution: TextLeadingDistribution.even,
                 ),
                 actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
                 insetPadding: const EdgeInsets.all(16),
-                shape: const RoundedRectangleBorder(
+                shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.zero,
-                  side: BorderSide(color: Color(0xff767c94)),
+                  side: BorderSide(color: palette.muted),
                 ),
               )
             : base.dialogTheme,
@@ -71,10 +77,10 @@ class FocusListApp extends ConsumerWidget {
                 labelStyle: _terminalTextStyle(base.textTheme.bodyMedium),
                 floatingLabelStyle: _terminalTextStyle(
                   base.textTheme.bodyMedium,
-                )?.copyWith(color: const Color(0xffb794f4)),
+                )?.copyWith(color: palette.accent),
                 hintStyle: _terminalTextStyle(
                   base.textTheme.bodyMedium,
-                )?.copyWith(color: const Color(0xff767c94)),
+                )?.copyWith(color: palette.muted),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
                   gapPadding: 5 * fontScale,
@@ -82,15 +88,12 @@ class FocusListApp extends ConsumerWidget {
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
                   gapPadding: 5 * fontScale,
-                  borderSide: const BorderSide(color: Color(0xff767c94)),
+                  borderSide: BorderSide(color: palette.muted),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.zero,
                   gapPadding: 5 * fontScale,
-                  borderSide: const BorderSide(
-                    color: Color(0xffb794f4),
-                    width: 2,
-                  ),
+                  borderSide: BorderSide(color: palette.accent, width: 2),
                 ),
                 contentPadding: EdgeInsets.fromLTRB(
                   8,
@@ -127,14 +130,14 @@ class FocusListApp extends ConsumerWidget {
               )
             : null,
         popupMenuTheme: terminal
-            ? const PopupMenuThemeData(
-                color: Color(0xff161926),
+            ? PopupMenuThemeData(
+                color: palette.panel,
                 elevation: 0,
                 menuPadding: EdgeInsets.symmetric(vertical: 2),
                 textStyle: TextStyle(fontFamily: 'UbuntuMonoNerd'),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.zero,
-                  side: BorderSide(color: Color(0xff767c94)),
+                  side: BorderSide(color: palette.muted),
                 ),
               )
             : null,

@@ -347,6 +347,7 @@ class AppSettings {
     this.nativeFontSize = 16,
     this.tagNames = const TagNames(),
     this.languageLocale = 'en',
+    this.themeId = 'classic',
   });
 
   final int marqueeSpeedMs;
@@ -357,6 +358,7 @@ class AppSettings {
   /// BCP-47-style locale identifier selected by the user (for example `es_419`).
   /// The presentation layer matches this against generated localization catalogs.
   final String languageLocale;
+  final String themeId;
 
   AppSettings copyWith({
     int? marqueeSpeedMs,
@@ -364,12 +366,14 @@ class AppSettings {
     int? nativeFontSize,
     TagNames? tagNames,
     String? languageLocale,
+    String? themeId,
   }) => AppSettings(
     marqueeSpeedMs: marqueeSpeedMs ?? this.marqueeSpeedMs,
     longTitleDisplay: longTitleDisplay ?? this.longTitleDisplay,
     nativeFontSize: nativeFontSize ?? this.nativeFontSize,
     tagNames: tagNames ?? this.tagNames,
     languageLocale: languageLocale ?? this.languageLocale,
+    themeId: themeId ?? this.themeId,
   );
 
   Map<String, Object?> toJson() => {
@@ -378,6 +382,7 @@ class AppSettings {
     'native_font_size': nativeFontSize,
     'tag_names': tagNames.toJson(),
     'language': languageLocale,
+    'theme': themeId,
   };
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
@@ -392,6 +397,7 @@ class AppSettings {
           : Map<String, Object?>.from(json['tag_names']! as Map),
     ),
     languageLocale: json['language'] as String? ?? 'en',
+    themeId: json['theme'] as String? ?? 'classic',
   );
 
   void validate() {
@@ -405,6 +411,9 @@ class AppSettings {
       throw const FormatException('native_font_size must be between 10 and 28');
     }
     tagNames.validate();
+    if (themeId.trim().isEmpty) {
+      throw const FormatException('theme must not be empty');
+    }
   }
 }
 

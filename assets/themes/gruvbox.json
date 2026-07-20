@@ -1,0 +1,13 @@
+{
+  "id": "gruvbox",
+  "name": "Gruvbox", 
+  "background": "#282828",
+  "panel": "#3c3836",
+  "text": "#ebdbb2",
+  "muted": "#a89984",
+  "accent": "#d79921",
+  "pending": "#fe8019",
+  "doing": "#83a598",
+  "done": "#b8bb26",
+  "error": "#fb4934"
+}

@@ -8,18 +8,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
 
 import '../app/ui_mode.dart';
+import '../app/theme_catalog.dart';
 import '../domain/models.dart';
 import '../l10n/app_localizations.dart';
 import 'terminal_style.dart';
 import 'workspace_view_model.dart';
-
-const _panel = terminalPanel;
-const _muted = terminalMuted;
-const _violet = terminalViolet;
-const _amber = terminalAmber;
-const _cyan = terminalCyan;
-const _green = terminalGreen;
-const _red = terminalRed;
 
 EdgeInsetsGeometry? get _dialogTitlePadding =>
     usesTerminalPresentation ? const EdgeInsets.fromLTRB(10, 8, 10, 0) : null;
@@ -29,11 +22,11 @@ EdgeInsetsGeometry? get _dialogContentPadding =>
 TextStyle? _dialogInputStyle(BuildContext context) =>
     usesTerminalPresentation ? Theme.of(context).textTheme.bodyMedium : null;
 
-Color _tagColor(TaskTag tag) => switch (tag) {
-  TaskTag.spade => _violet,
-  TaskTag.heart => _green,
-  TaskTag.club => _red,
-  TaskTag.diamond => _amber,
+Color _tagColor(BuildContext context, TaskTag tag) => switch (tag) {
+  TaskTag.spade => TerminalPalette.of(context).accent,
+  TaskTag.heart => TerminalPalette.of(context).done,
+  TaskTag.club => TerminalPalette.of(context).error,
+  TaskTag.diamond => TerminalPalette.of(context).pending,
 };
 
 class WorkspaceScreen extends ConsumerStatefulWidget {
@@ -147,9 +140,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     if (usesTerminalPresentation &&
         event is KeyDownEvent &&
         key == LogicalKeyboardKey.keyT) {
-      unawaited(
-        vm.cycleSelectedTag(HardwareKeyboard.instance.isShiftPressed ? 1 : 0),
-      );
+      unawaited(_showThemePicker());
       return KeyEventResult.handled;
     }
     if (_grabbed) {
@@ -292,7 +283,10 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
         builder: (_) => AlertDialog(
           titlePadding: _dialogTitlePadding,
           contentPadding: _dialogContentPadding,
-          title: Text(title, style: const TextStyle(color: _red)),
+          title: Text(
+            title,
+            style: TextStyle(color: TerminalPalette.of(context).error),
+          ),
           content: Text(content),
           actions: [
             TextButton(
@@ -300,7 +294,9 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
               child: Text(AppLocalizations.of(context)!.cancel),
             ),
             FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _red),
+              style: FilledButton.styleFrom(
+                backgroundColor: TerminalPalette.of(context).error,
+              ),
               onPressed: () => Navigator.pop(context, true),
               child: Text(AppLocalizations.of(context)!.delete),
             ),
@@ -313,6 +309,14 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     await showDialog<void>(
       context: context,
       builder: (_) => const _SettingsDialog(),
+    );
+    _focusNode.requestFocus();
+  }
+
+  Future<void> _showThemePicker() async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => const _ThemePickerDialog(),
     );
     _focusNode.requestFocus();
   }
@@ -458,7 +462,9 @@ class _Header extends ConsumerWidget {
       child: Row(
         children: [
           Container(
-            color: terminal ? _violet : Colors.transparent,
+            color: terminal
+                ? TerminalPalette.of(context).accent
+                : Colors.transparent,
             padding: EdgeInsets.symmetric(
               horizontal: terminal ? 8 : 0,
               vertical: terminal ? 1 : 0,
@@ -467,7 +473,9 @@ class _Header extends ConsumerWidget {
             child: Text(
               strings.workspaceTitle,
               style: TextStyle(
-                color: terminal ? terminalBackground : _violet,
+                color: terminal
+                    ? TerminalPalette.of(context).background
+                    : TerminalPalette.of(context).accent,
                 fontWeight: FontWeight.bold,
                 fontSize: terminal ? null : 20,
               ),
@@ -476,7 +484,10 @@ class _Header extends ConsumerWidget {
           const Spacer(),
           Text(
             _viewLabel(state.view, strings),
-            style: const TextStyle(color: _muted, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: TerminalPalette.of(context).muted,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           if (!terminal) ...[
             const SizedBox(width: 8),
@@ -557,12 +568,16 @@ class _Tabs extends ConsumerWidget {
                     horizontal: 8,
                     vertical: 1,
                   ),
-                  color: selected ? _violet : _panel,
+                  color: selected
+                      ? TerminalPalette.of(context).accent
+                      : TerminalPalette.of(context).panel,
                   child: Text(
                     list.name,
                     textAlign: TextAlign.left,
                     style: TextStyle(
-                      color: selected ? const Color(0xff0d0f18) : _muted,
+                      color: selected
+                          ? TerminalPalette.of(context).background
+                          : TerminalPalette.of(context).muted,
                       fontWeight: selected
                           ? FontWeight.bold
                           : FontWeight.normal,
@@ -573,7 +588,7 @@ class _Tabs extends ConsumerWidget {
             : ChoiceChip(
                 selected: selected,
                 label: Text(list.name),
-                selectedColor: _violet,
+                selectedColor: TerminalPalette.of(context).accent,
                 onSelected: (_) => ref
                     .read(workspaceViewModelProvider.notifier)
                     .selectList(list.id),
@@ -622,16 +637,16 @@ class _TaskPanel extends ConsumerWidget {
       WorkspaceView.multi => _MultiContent(state: state),
     };
     final border = switch (state.view) {
-      WorkspaceView.list => _violet,
-      WorkspaceView.focus => _cyan,
-      WorkspaceView.completed => _green,
-      WorkspaceView.multi => _violet,
+      WorkspaceView.list => TerminalPalette.of(context).accent,
+      WorkspaceView.focus => TerminalPalette.of(context).doing,
+      WorkspaceView.completed => TerminalPalette.of(context).done,
+      WorkspaceView.multi => TerminalPalette.of(context).accent,
     };
     return Container(
       key: ValueKey('task-panel-${state.view.name}'),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: _panel,
+        color: TerminalPalette.of(context).panel,
         border: Border.all(color: border),
         borderRadius: usesTerminalPresentation
             ? BorderRadius.circular(TerminalMetrics.panelRadius)
@@ -649,7 +664,7 @@ class _ListContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) => _TaskScrollView(
     key: const ValueKey('task-scroll-list'),
-    indicatorColor: _violet,
+    indicatorColor: TerminalPalette.of(context).accent,
     padding: usesTerminalPresentation
         ? TerminalMetrics.panelPadding(context)
         : const EdgeInsets.all(12),
@@ -685,7 +700,7 @@ class _FocusContent extends StatelessWidget {
     );
     return _TaskScrollView(
       key: const ValueKey('task-scroll-focus'),
-      indicatorColor: _cyan,
+      indicatorColor: TerminalPalette.of(context).doing,
       padding: usesTerminalPresentation
           ? TerminalMetrics.panelPadding(context)
           : const EdgeInsets.all(12),
@@ -710,7 +725,7 @@ class _CompletedContent extends StatelessWidget {
     }
     return _TaskScrollView(
       key: const ValueKey('task-scroll-completed'),
-      indicatorColor: _green,
+      indicatorColor: TerminalPalette.of(context).done,
       padding: usesTerminalPresentation
           ? TerminalMetrics.panelPadding(context)
           : const EdgeInsets.all(12),
@@ -743,7 +758,10 @@ class _MultiContent extends StatelessWidget {
           ),
           child: Text(
             list.name.toUpperCase(),
-            style: const TextStyle(color: _violet, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: TerminalPalette.of(context).accent,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       );
@@ -767,7 +785,7 @@ class _MultiContent extends StatelessWidget {
         ? _EmptyState(AppLocalizations.of(context)!.noDoingOrPendingTasks)
         : _TaskScrollView(
             key: const ValueKey('task-scroll-multi'),
-            indicatorColor: _violet,
+            indicatorColor: TerminalPalette.of(context).accent,
             padding: usesTerminalPresentation
                 ? TerminalMetrics.panelPadding(context)
                 : const EdgeInsets.all(12),
@@ -981,7 +999,7 @@ class _TaskSection extends StatelessWidget {
           Text(
             '${_statusIcon(status)} $title (${tasks.where((task) => task.parentId == null).length})',
             style: TextStyle(
-              color: _statusColor(status),
+              color: _statusColor(context, status),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -996,7 +1014,7 @@ class _TaskSection extends StatelessWidget {
               ),
               child: Text(
                 '· ${AppLocalizations.of(context)!.empty}',
-                style: const TextStyle(color: _muted),
+                style: TextStyle(color: TerminalPalette.of(context).muted),
               ),
             )
           else
@@ -1032,10 +1050,10 @@ class _TaskRow extends ConsumerWidget {
       speed: state.settings.marqueeSpeedMs,
       style: TextStyle(
         color: selected
-            ? const Color(0xff0d0f18)
+            ? TerminalPalette.of(context).background
             : done
-            ? _muted
-            : Colors.white,
+            ? TerminalPalette.of(context).muted
+            : TerminalPalette.of(context).text,
         fontWeight: selected ? FontWeight.bold : FontWeight.normal,
         decoration: done ? TextDecoration.lineThrough : null,
       ),
@@ -1068,9 +1086,9 @@ class _TaskRow extends ConsumerWidget {
           ).add(EdgeInsets.only(left: terminal ? 0 : depth * 16.0)),
           decoration: BoxDecoration(
             color: animated
-                ? _statusColor(task.status)
+                ? _statusColor(context, task.status)
                 : selected
-                ? _violet
+                ? TerminalPalette.of(context).accent
                 : Colors.transparent,
             borderRadius: terminal
                 ? BorderRadius.zero
@@ -1084,7 +1102,9 @@ class _TaskRow extends ConsumerWidget {
               Text(
                 '${terminal ? '  ' * depth : ''}${hasChildren ? (task.collapsed ? '▸ ' : '▾ ') : (selected ? '› ' : '- ')}',
                 style: TextStyle(
-                  color: selected ? const Color(0xff0d0f18) : _muted,
+                  color: selected
+                      ? TerminalPalette.of(context).background
+                      : TerminalPalette.of(context).muted,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -1095,13 +1115,17 @@ class _TaskRow extends ConsumerWidget {
                     ? Text(
                         ' ↻',
                         style: TextStyle(
-                          color: selected ? const Color(0xff0d0f18) : _green,
+                          color: selected
+                              ? TerminalPalette.of(context).background
+                              : TerminalPalette.of(context).done,
                         ),
                       )
                     : Icon(
                         Icons.repeat,
                         size: 16,
-                        color: selected ? const Color(0xff0d0f18) : _green,
+                        color: selected
+                            ? TerminalPalette.of(context).background
+                            : TerminalPalette.of(context).done,
                       ),
               if (completedAt != null)
                 Padding(
@@ -1109,7 +1133,9 @@ class _TaskRow extends ConsumerWidget {
                   child: Text(
                     _localStamp(completedAt!),
                     style: TextStyle(
-                      color: selected ? const Color(0xff0d0f18) : _muted,
+                      color: selected
+                          ? TerminalPalette.of(context).background
+                          : TerminalPalette.of(context).muted,
                       fontSize: terminal ? null : 12,
                     ),
                   ),
@@ -1120,8 +1146,8 @@ class _TaskRow extends ConsumerWidget {
                 IconButton(
                   tooltip: AppLocalizations.of(context)!.advanceTask,
                   color: selected
-                      ? const Color(0xff0d0f18)
-                      : _statusColor(task.status),
+                      ? TerminalPalette.of(context).background
+                      : _statusColor(context, task.status),
                   onPressed: () {
                     ref
                         .read(workspaceViewModelProvider.notifier)
@@ -1139,7 +1165,9 @@ class _TaskRow extends ConsumerWidget {
                   tooltip: AppLocalizations.of(context)!.taskActions,
                   icon: Icon(
                     Icons.more_vert,
-                    color: selected ? const Color(0xff0d0f18) : _muted,
+                    color: selected
+                        ? TerminalPalette.of(context).background
+                        : TerminalPalette.of(context).muted,
                   ),
                   onSelected: (action) =>
                       _handleTaskAction(context, ref, task, action),
@@ -1214,7 +1242,7 @@ class _TaskTags extends StatelessWidget {
       width: cell * cells,
       child: ColoredBox(
         color: terminal && selected && task.tags.isNotEmpty
-            ? _violet
+            ? TerminalPalette.of(context).accent
             : Colors.transparent,
         child: Row(
           mainAxisAlignment: MainAxisAlignment.end,
@@ -1228,8 +1256,8 @@ class _TaskTags extends StatelessWidget {
                     tag.glyph,
                     style: TextStyle(
                       color: terminal && selected
-                          ? terminalBackground
-                          : _tagColor(tag),
+                          ? TerminalPalette.of(context).background
+                          : _tagColor(context, tag),
                     ),
                   ),
                 ),
@@ -1282,7 +1310,10 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) => Center(
     child: Padding(
       padding: const EdgeInsets.all(24),
-      child: Text('· $text', style: const TextStyle(color: _muted)),
+      child: Text(
+        '· $text',
+        style: TextStyle(color: TerminalPalette.of(context).muted),
+      ),
     ),
   );
 }
@@ -1412,21 +1443,29 @@ class _Footer extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              color: state.notice!.error ? _red : _green,
+              color: state.notice!.error
+                  ? TerminalPalette.of(context).error
+                  : TerminalPalette.of(context).done,
               fontWeight: FontWeight.bold,
             ),
           )
         : grabbed
         ? Text(
             AppLocalizations.of(context)!.spaceArmed,
-            style: TextStyle(color: _amber, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: TerminalPalette.of(context).pending,
+              fontWeight: FontWeight.bold,
+            ),
           )
         : state.selectedTask?.daily ?? false
         ? Text(
             AppLocalizations.of(
               context,
             )!.dailyActivity(_dailyActivity(state.selectedTask!)),
-            style: const TextStyle(color: _green, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              color: TerminalPalette.of(context).done,
+              fontWeight: FontWeight.bold,
+            ),
           )
         : terminal
         ? const Text(' ')
@@ -1440,7 +1479,10 @@ class _Footer extends ConsumerWidget {
           const SizedBox(height: 3),
           Text(
             AppLocalizations.of(context)!.keyboardHint,
-            style: TextStyle(color: _muted, fontSize: 12),
+            style: TextStyle(
+              color: TerminalPalette.of(context).muted,
+              fontSize: 12,
+            ),
           ),
         ],
       );
@@ -1489,8 +1531,12 @@ class _Footer extends ConsumerWidget {
                 label: AppLocalizations.of(context)!.commandSort,
               ),
               _TerminalCommand(
-                keys: 't/shift+t',
-                label: AppLocalizations.of(context)!.commandTags,
+                keys: 't',
+                label: 'themes',
+                onTap: () => showDialog<void>(
+                  context: context,
+                  builder: (_) => const _ThemePickerDialog(),
+                ),
               ),
               _TerminalCommand(
                 keys: 'ctrl+n',
@@ -1544,15 +1590,170 @@ class _TerminalCommand extends StatelessWidget {
           children: [
             Text(
               keys,
-              style: const TextStyle(
-                color: _violet,
+              style: TextStyle(
+                color: TerminalPalette.of(context).accent,
                 fontWeight: FontWeight.bold,
               ),
             ),
             SizedBox(width: TerminalMetrics.cell(context)),
-            Text(label, style: const TextStyle(color: _muted)),
+            Text(
+              label,
+              style: TextStyle(color: TerminalPalette.of(context).muted),
+            ),
           ],
         ),
+      ),
+    ),
+  );
+}
+
+class _ThemePickerDialog extends ConsumerStatefulWidget {
+  const _ThemePickerDialog();
+
+  @override
+  ConsumerState<_ThemePickerDialog> createState() => _ThemePickerDialogState();
+}
+
+class _ThemePickerDialogState extends ConsumerState<_ThemePickerDialog> {
+  final _focusNode = FocusNode(debugLabel: 'theme-picker');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _focusNode.requestFocus(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _cycle(int direction) {
+    final catalog = ref.read(themeCatalogProvider);
+    final current = ref.read(workspaceViewModelProvider).settings.themeId;
+    final index = catalog.themes.indexWhere((theme) => theme.id == current);
+    final next =
+        catalog.themes[(index + direction + catalog.themes.length) %
+            catalog.themes.length];
+    _select(next.id);
+  }
+
+  void _select(String id) {
+    final vm = ref.read(workspaceViewModelProvider.notifier);
+    final settings = ref.read(workspaceViewModelProvider).settings;
+    unawaited(vm.updateSettings(settings.copyWith(themeId: id)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(workspaceViewModelProvider);
+    final catalog = ref.watch(themeCatalogProvider);
+    final theme = catalog.byId(state.settings.themeId);
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: (_, event) {
+        if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+          return KeyEventResult.ignored;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowLeft) {
+          _cycle(-1);
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.arrowRight) {
+          _cycle(1);
+          return KeyEventResult.handled;
+        }
+        if (event.logicalKey == LogicalKeyboardKey.escape ||
+            event.logicalKey == LogicalKeyboardKey.keyT) {
+          Navigator.pop(context);
+          return KeyEventResult.handled;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: AlertDialog(
+        titlePadding: _dialogTitlePadding,
+        contentPadding: _dialogContentPadding,
+        title: const Text('Themes'),
+        content: SizedBox(
+          width: 360,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ThemePreview(theme: theme),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final item in catalog.themes)
+                    TextButton(
+                      onPressed: () => _select(item.id),
+                      child: Text(item.name),
+                    ),
+                ],
+              ),
+              Text(
+                '← / → to cycle',
+                style: TextStyle(color: TerminalPalette.of(context).muted),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThemePreview extends StatelessWidget {
+  const _ThemePreview({required this.theme});
+  final AppThemeDefinition theme;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    color: theme.panel,
+    padding: TerminalMetrics.panelPadding(context),
+    child: DefaultTextStyle(
+      style: Theme.of(
+        context,
+      ).textTheme.bodyMedium!.copyWith(color: theme.text),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('● Doing', style: TextStyle(color: theme.doing)),
+          Text('◌ Pending', style: TextStyle(color: theme.pending)),
+          Text('✓ Done', style: TextStyle(color: theme.done)),
+          const Text('  sample task'),
+          Text(
+            '  sample task',
+            style: TextStyle(
+              color: theme.muted,
+              decoration: TextDecoration.lineThrough,
+            ),
+          ),
+          Container(
+            width: double.infinity,
+            color: theme.accent,
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: Text(
+              '› selected task',
+              style: TextStyle(
+                color: theme.background,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     ),
   );
@@ -1890,7 +2091,7 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                         child: Text(
                           tag.glyph,
                           style: TextStyle(
-                            color: _tagColor(tag),
+                            color: _tagColor(context, tag),
                             fontWeight: FontWeight.bold,
                           ),
                         ),
@@ -1911,7 +2112,10 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
               if (_tagError != null)
                 Align(
                   alignment: Alignment.centerLeft,
-                  child: Text(_tagError!, style: const TextStyle(color: _red)),
+                  child: Text(
+                    _tagError!,
+                    style: TextStyle(color: TerminalPalette.of(context).error),
+                  ),
                 ),
               Align(
                 alignment: Alignment.centerRight,
@@ -1957,8 +2161,8 @@ class _TerminalToggle extends StatelessWidget {
           children: [
             Text(
               value ? '[x]' : '[ ]',
-              style: const TextStyle(
-                color: _violet,
+              style: TextStyle(
+                color: TerminalPalette.of(context).accent,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -2036,10 +2240,10 @@ String _statusIcon(TaskStatus status) => switch (status) {
   TaskStatus.done => '✓',
 };
 
-Color _statusColor(TaskStatus status) => switch (status) {
-  TaskStatus.pending => _amber,
-  TaskStatus.doing => _cyan,
-  TaskStatus.done => _green,
+Color _statusColor(BuildContext context, TaskStatus status) => switch (status) {
+  TaskStatus.pending => TerminalPalette.of(context).pending,
+  TaskStatus.doing => TerminalPalette.of(context).doing,
+  TaskStatus.done => TerminalPalette.of(context).done,
 };
 
 String _localStamp(DateTime value) {
@@ -2083,7 +2287,7 @@ Future<void> _handleTaskAction(
             contentPadding: _dialogContentPadding,
             title: Text(
               AppLocalizations.of(context)!.deleteTaskTitle,
-              style: const TextStyle(color: _red),
+              style: TextStyle(color: TerminalPalette.of(context).error),
             ),
             content: Text(AppLocalizations.of(context)!.deleteTaskBody),
             actions: [

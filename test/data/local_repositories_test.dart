@@ -33,6 +33,7 @@ void main() {
     final settings = await LocalSettingsRepository(store).load();
 
     expect(settings.marqueeSpeedMs, defaultMarqueeSpeedMs);
+    expect(settings.themeId, 'classic');
     expect(store.settings, isNotNull);
   });
 

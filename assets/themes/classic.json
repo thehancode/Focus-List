@@ -1,0 +1,13 @@
+{
+  "id": "classic",
+  "name": "Classic",
+  "background": "#0d0f18",
+  "panel": "#161926",
+  "text": "#dde0eb",
+  "muted": "#767c94",
+  "accent": "#b794f4",
+  "pending": "#f9bf60",
+  "doing": "#5dd3dc",
+  "done": "#7dcf91",
+  "error": "#f4707a"
+}

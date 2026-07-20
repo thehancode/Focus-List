@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:flutter_app/app/focus_list_app.dart';
+import 'package:flutter_app/app/theme_catalog.dart';
 import 'package:flutter_app/data/providers.dart';
 import 'package:flutter_app/domain/models.dart';
 import 'package:flutter_app/domain/repositories.dart';
@@ -113,13 +114,13 @@ void main() {
     for (final name in ['TASKS', 'WORK']) {
       final label = find.text(name);
       expect(label, findsOneWidget);
-      expect(tester.widget<Text>(label).style?.color, terminalViolet);
+      expect(tester.widget<Text>(label).style?.color, classic.accent);
     }
     final panel = tester.widget<Container>(
       find.byKey(const ValueKey('task-panel-multi')),
     );
     final decoration = panel.decoration! as BoxDecoration;
-    expect(decoration.border, Border.all(color: terminalViolet));
+    expect(decoration.border, Border.all(color: classic.accent));
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
@@ -374,7 +375,9 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
-  testWidgets('T and Shift+T cycle selected terminal tags', (tester) async {
+  testWidgets('T opens the terminal theme picker and arrows cycle themes', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     await tester.binding.setSurfaceSize(const Size(700, 500));
@@ -394,34 +397,15 @@ void main() {
 
     await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
     await tester.pump();
-    expect(find.text('●'), findsOneWidget);
+    expect(find.text('Themes'), findsOneWidget);
+    expect(find.text('Classic'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
     expect(
-      tester.widget<Text>(find.text('●')).style?.color,
-      terminalBackground,
-    );
-    await tester.sendKeyRepeatEvent(LogicalKeyboardKey.keyT);
-    await tester.pump();
-    expect(find.text('●'), findsOneWidget);
-    expect(find.text('▲'), findsNothing);
-
-    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-    await tester.sendKeyEvent(LogicalKeyboardKey.keyT);
-    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-    await tester.pump();
-    expect(find.text('▲'), findsOneWidget);
-    expect(
-      tester.widget<Text>(find.text('▲')).style?.color,
-      terminalBackground,
-    );
-    expect(
-      tester.getSize(find.byKey(const ValueKey('task-tags-task-1'))).width,
-      closeTo(
-        TerminalMetrics.cell(
-              tester.element(find.byKey(const ValueKey('task-tags-task-1'))),
-            ) *
-            2,
-        .01,
-      ),
+      Theme.of(
+        tester.element(find.text('Themes')),
+      ).extension<TerminalPalette>()!.theme.id,
+      'gruvbox',
     );
     debugDefaultTargetPlatformOverride = null;
   });
@@ -519,10 +503,10 @@ void main() {
       of: tags,
       matching: find.byType(ColoredBox),
     );
-    expect(tester.widget<ColoredBox>(tagBackground).color, terminalViolet);
+    expect(tester.widget<ColoredBox>(tagBackground).color, classic.accent);
     expect(
       tester.widget<Text>(find.text('▲')).style?.color,
-      terminalBackground,
+      classic.background,
     );
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
