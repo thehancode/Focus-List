@@ -199,6 +199,45 @@ void main() {
         ),
         isTrue,
       );
+      await vm.advanceSelectedTask();
+      expect(
+        repository.lists.single.tasks.every(
+          (task) => task.status == TaskStatus.doing,
+        ),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'arrow navigation follows rendered category and subtree order',
+    () async {
+      final list = _list('tasks', 'Tasks', [
+        _task('pending-root', 'Pending root'),
+        _task('pending-child', 'Pending child', parentId: 'pending-root'),
+        _task('done-root', 'Done root', status: TaskStatus.done),
+        _task('pending-next', 'Pending next'),
+      ]);
+      final container = _container([list]);
+      addTearDown(container.dispose);
+      final vm = await _ready(container);
+
+      expect(container.read(workspaceViewModelProvider).visibleTaskIds, [
+        'pending-root',
+        'pending-child',
+        'pending-next',
+        'done-root',
+      ]);
+      vm.moveSelection(1);
+      expect(
+        container.read(workspaceViewModelProvider).selectedTaskId,
+        'pending-child',
+      );
+      vm.moveSelection(1);
+      expect(
+        container.read(workspaceViewModelProvider).selectedTaskId,
+        'pending-next',
+      );
     },
   );
 

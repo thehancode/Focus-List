@@ -124,9 +124,11 @@ extension WorkspaceStateQueries on WorkspaceState {
   }
 
   List<String> get visibleTaskIds => switch (view) {
-    WorkspaceView.list => visibleTreeTasks(
-      currentList,
-    ).map((task) => task.id).toList(),
+    WorkspaceView.list => visibleTreeTasksInStatusOrder(currentList, const [
+      TaskStatus.doing,
+      TaskStatus.pending,
+      TaskStatus.done,
+    ]).map((task) => task.id).toList(),
     WorkspaceView.focus => visibleTreeTasks(
       currentList,
       rootStatuses: const {TaskStatus.doing},
@@ -136,10 +138,10 @@ extension WorkspaceStateQueries on WorkspaceState {
     ).map((row) => row.task.id).toList(),
     WorkspaceView.multi => [
       for (final list in lists)
-        ...visibleTreeTasks(
-          list,
-          rootStatuses: const {TaskStatus.doing, TaskStatus.pending},
-        ).map((task) => task.id),
+        ...visibleTreeTasksInStatusOrder(list, const [
+          TaskStatus.doing,
+          TaskStatus.pending,
+        ]).map((task) => task.id),
     ],
   };
 
@@ -195,6 +197,19 @@ List<Task> visibleTreeTasks(TaskList? list, {Set<TaskStatus>? rootStatuses}) {
     if (task.collapsed) hiddenParents.add(task.id);
   }
   return result;
+}
+
+List<Task> visibleTreeTasksInStatusOrder(
+  TaskList? list,
+  List<TaskStatus> statuses,
+) {
+  if (list == null) return const [];
+  final visible = visibleTreeTasks(list, rootStatuses: statuses.toSet());
+  return [
+    for (final status in statuses)
+      for (final task in visible)
+        if (taskRoot(list, task).status == status) task,
+  ];
 }
 
 Task taskRoot(TaskList list, Task task) {
@@ -751,6 +766,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final root = taskRoot(list, selected);
     final cascadeIds = <String>{selected.id};
     if (to == TaskStatus.done ||
+        (selected.parentId == null && to == TaskStatus.doing) ||
         (selected.parentId == null && to == TaskStatus.pending)) {
       cascadeIds.addAll(taskDescendants(list, selected).map((task) => task.id));
     }
