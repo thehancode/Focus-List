@@ -73,7 +73,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyboardShortcutsHelp =>
-      '↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder task/subtree\nN / A / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit';
+      '↑/↓ or J/K   Move selection\n←/→   Switch task lists\nSpace then F   Advance status\nSpace then Space   Complete subtree\nSpace then ↑/↓   Reorder task/subtree\nN / Tab / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nW / Shift+W   Cycle first / second tag\nCtrl+C   Copy task title\nCtrl+Shift+C   Copy current section\nCtrl+F or /   Search\nCtrl+Z   Undo\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit';
 
   @override
   String get couldNotLoad => 'Could not load Focus List';
@@ -260,6 +260,116 @@ class AppLocalizationsEn extends AppLocalizations {
   String languageValue(Object language) {
     return 'Language: $language';
   }
+
+  @override
+  String get showTips => 'Show entrance tips';
+
+  @override
+  String get rewardDuration => 'Reward duration';
+
+  @override
+  String get tipsTitle => 'Tips';
+
+  @override
+  String get tipNavigation => 'Use left and right to switch task lists.';
+
+  @override
+  String get tipReorder =>
+      'Press Space, then up or down, to reorder a task subtree.';
+
+  @override
+  String get tipSubtasks => 'Press Tab to add a subtask to the selected task.';
+
+  @override
+  String get tipSearch => 'Press Ctrl+F or / to search tasks.';
+
+  @override
+  String get tipCopy =>
+      'Ctrl+C copies one title; Ctrl+Shift+C copies its section.';
+
+  @override
+  String get rewardGreatWork => 'Great work!';
+
+  @override
+  String get rewardNicelyDone => 'Nicely done!';
+
+  @override
+  String get rewardKeepGoing => 'Keep going!';
+
+  @override
+  String get rewardMomentum => 'Momentum gained!';
+
+  @override
+  String get rewardTaskCleared => 'Task cleared!';
+
+  @override
+  String get rewardExcellent => 'Excellent!';
+
+  @override
+  String get search => 'Search';
+
+  @override
+  String get previousMatch => 'Previous match';
+
+  @override
+  String get nextMatch => 'Next match';
+
+  @override
+  String get closeSearch => 'Close search';
+
+  @override
+  String get typeToSearch => 'Type to search';
+
+  @override
+  String get noSearchMatches => 'No matches';
+
+  @override
+  String get longTitleMode => 'Long-title mode';
+
+  @override
+  String get wrapSelected => 'Wrap selected';
+
+  @override
+  String get wrapAll => 'Wrap all';
+
+  @override
+  String get slidingWindow => 'Sliding window';
+
+  @override
+  String get marquee => 'Marquee';
+
+  @override
+  String get shortDuration => 'Short';
+
+  @override
+  String get mediumDuration => 'Medium';
+
+  @override
+  String get longDuration => 'Long';
+
+  @override
+  String get backgroundImage => 'Background image';
+
+  @override
+  String get backgroundOpacity => 'Background color opacity';
+
+  @override
+  String get backgroundFit => 'Image fit';
+
+  @override
+  String get cover => 'Cover';
+
+  @override
+  String get contain => 'Contain';
+
+  @override
+  String get noImageSelected => 'No image selected';
+
+  @override
+  String get none => 'None';
+
+  @override
+  String get clear => 'Clear';
 
   @override
   String get languageName => 'English';

@@ -9,10 +9,12 @@ import 'package:window_manager/window_manager.dart';
 
 import '../app/ui_mode.dart';
 import '../app/theme_catalog.dart';
+import '../app/desktop_background.dart';
 import '../domain/models.dart';
 import '../l10n/app_localizations.dart';
 import 'terminal_style.dart';
 import 'workspace_view_model.dart';
+import 'workspace_projection.dart';
 
 EdgeInsetsGeometry? get _dialogTitlePadding =>
     usesTerminalPresentation ? const EdgeInsets.fromLTRB(10, 8, 10, 0) : null;
@@ -86,10 +88,6 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
   }
 
   KeyEventResult _onKey(FocusNode _, KeyEvent event) {
-    if (event is KeyUpEvent && event.logicalKey == LogicalKeyboardKey.space) {
-      _releaseGrab();
-      return KeyEventResult.handled;
-    }
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
@@ -100,7 +98,19 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     final key = event.logicalKey;
     if (control) {
       if (key == LogicalKeyboardKey.keyC) {
-        SystemNavigator.pop();
+        if (HardwareKeyboard.instance.isShiftPressed) {
+          unawaited(_copyCurrentSection());
+        } else {
+          unawaited(_copySelectedTitle());
+        }
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.keyZ) {
+        unawaited(vm.undo());
+        return KeyEventResult.handled;
+      }
+      if (key == LogicalKeyboardKey.keyF) {
+        vm.openSearch();
         return KeyEventResult.handled;
       }
       if (key == LogicalKeyboardKey.keyA) vm.toggleMultiView();
@@ -112,11 +122,24 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.tab) {
-      vm.cycleList(HardwareKeyboard.instance.isShiftPressed ? -1 : 1);
+      unawaited(_showTaskEditor(subtask: true));
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowLeft) {
+      vm.cycleList(-1);
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.arrowRight) {
+      vm.cycleList(1);
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.space) {
-      _armGrab();
+      if (_grabbed) {
+        unawaited(vm.completeSelectedTask());
+        _releaseGrab();
+      } else {
+        _armGrab();
+      }
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.arrowUp || key == LogicalKeyboardKey.keyK) {
@@ -149,6 +172,12 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       unawaited(
         vm.cycleSelectedTag(HardwareKeyboard.instance.isShiftPressed ? 1 : 0),
       );
+      return KeyEventResult.handled;
+    }
+    if (usesTerminalPresentation &&
+        event is KeyDownEvent &&
+        event.character == '/') {
+      vm.openSearch();
       return KeyEventResult.handled;
     }
     if (_grabbed) {
@@ -190,6 +219,24 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     return KeyEventResult.handled;
   }
 
+  Future<void> _copySelectedTitle() async {
+    final task = ref.read(workspaceViewModelProvider).selectedTask;
+    if (task == null) return;
+    await Clipboard.setData(ClipboardData(text: task.title));
+  }
+
+  Future<void> _copyCurrentSection() async {
+    final state = ref.read(workspaceViewModelProvider);
+    final section = selectedTaskSection(state);
+    if (section == null) return;
+    await Clipboard.setData(
+      ClipboardData(text: sectionAsIndentedText(section)),
+    );
+    ref
+        .read(workspaceViewModelProvider.notifier)
+        .highlightTasks(section.tasks.map((task) => task.id));
+  }
+
   Future<void> _showTaskEditor({
     bool edit = false,
     bool duplicate = false,
@@ -215,7 +262,7 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
             : subtask
             ? strings.newSubtask
             : strings.newTask,
-        initialTitle: selected?.title ?? '',
+        initialTitle: edit || duplicate ? selected?.title ?? '' : '',
         initialDaily: subtask ? false : selected?.daily ?? false,
         allowDaily:
             !subtask && (!edit && !duplicate || selected?.parentId == null),
@@ -336,7 +383,30 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       contentPadding: _dialogContentPadding,
       title: Text(AppLocalizations.of(context)!.keyboardShortcuts),
       content: SingleChildScrollView(
-        child: Text(AppLocalizations.of(context)!.keyboardShortcutsHelp),
+        child: Builder(
+          builder: (context) {
+            final strings = AppLocalizations.of(context)!;
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(strings.keyboardShortcutsHelp),
+                const SizedBox(height: 12),
+                Text(
+                  strings.tipsTitle,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                for (final id in const [
+                  'navigation',
+                  'reorder',
+                  'subtasks',
+                  'search',
+                  'copy',
+                ])
+                  Text('• ${_tipText(strings, id)}'),
+              ],
+            );
+          },
+        ),
       ),
       actions: [
         TextButton(
@@ -350,7 +420,35 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(workspaceViewModelProvider);
+    ref.listen(
+      workspaceViewModelProvider.select((value) => value.search != null),
+      (previous, searching) {
+        if (previous == true && !searching) {
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _focusNode.requestFocus(),
+          );
+        }
+      },
+    );
     final terminal = usesTerminalPresentation;
+    final appearance = state.deviceState.desktopAppearance;
+    final backgroundPath =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.linux
+        ? appearance.backgroundImagePath
+        : null;
+    final backgroundState = backgroundPath == null
+        ? null
+        : ref.watch(desktopBackgroundBytesProvider(backgroundPath));
+    if (backgroundPath != null) {
+      ref.listen(desktopBackgroundBytesProvider(backgroundPath), (_, next) {
+        if (next.hasValue && next.value == null) {
+          ref
+              .read(workspaceViewModelProvider.notifier)
+              .reportBackgroundUnavailable();
+        }
+      });
+    }
+    final background = backgroundState?.value;
     if (state.phase == WorkspacePhase.loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
@@ -417,10 +515,106 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
                 label: Text(AppLocalizations.of(context)!.task),
               )
             : null,
-        body: workspace,
+        body: Stack(
+          children: [
+            if (background != null)
+              Positioned.fill(
+                child: Image.memory(
+                  background,
+                  fit: appearance.backgroundFit == DesktopBackgroundFit.cover
+                      ? BoxFit.cover
+                      : BoxFit.contain,
+                ),
+              ),
+            if (background != null)
+              Positioned.fill(
+                child: ColoredBox(
+                  color: TerminalPalette.of(context).background.withValues(
+                    alpha: appearance.backgroundOverlayOpacity,
+                  ),
+                ),
+              ),
+            Positioned.fill(child: workspace),
+            if (terminal && state.tipId != null)
+              Positioned(
+                left: TerminalMetrics.cell(context),
+                right: TerminalMetrics.cell(context),
+                top: usesFramelessDesktopWindow
+                    ? TerminalMetrics.line(context) * 2
+                    : TerminalMetrics.line(context),
+                child: IgnorePointer(
+                  child: _TransientBanner(
+                    text: _tipText(AppLocalizations.of(context)!, state.tipId!),
+                  ),
+                ),
+              ),
+            if (terminal && state.reward != null)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _RewardOverlay(
+                    text: _rewardText(
+                      AppLocalizations.of(context)!,
+                      state.reward!.messageIndex,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
+}
+
+class _TransientBanner extends StatelessWidget {
+  const _TransientBanner({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => DecoratedBox(
+    decoration: BoxDecoration(
+      color: TerminalPalette.of(context).panel,
+      border: Border.all(color: TerminalPalette.of(context).doing),
+    ),
+    child: Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: TerminalMetrics.cell(context),
+        vertical: 2,
+      ),
+      child: Text('TIP: $text'),
+    ),
+  );
+}
+
+class _RewardOverlay extends StatelessWidget {
+  const _RewardOverlay({required this.text});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => ColoredBox(
+    color: TerminalPalette.of(context).background.withValues(alpha: .72),
+    child: Center(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: TerminalPalette.of(context).panel,
+          border: Border.all(color: TerminalPalette.of(context).done, width: 2),
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: TerminalMetrics.cell(context) * 3,
+            vertical: TerminalMetrics.line(context),
+          ),
+          child: Text(
+            '✦  $text  ✦',
+            style: TextStyle(
+              color: TerminalPalette.of(context).done,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
 }
 
 class _DesktopWindowDragArea extends StatelessWidget {
@@ -638,12 +832,15 @@ class _TaskPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final content = switch (state.view) {
+    final normalContent = switch (state.view) {
       WorkspaceView.list => _ListContent(state: state),
       WorkspaceView.focus => _FocusContent(state: state),
       WorkspaceView.completed => _CompletedContent(state: state),
       WorkspaceView.multi => _MultiContent(state: state),
     };
+    final content = state.search == null
+        ? normalContent
+        : _SearchContent(state: state);
     final border = switch (state.view) {
       WorkspaceView.list => TerminalPalette.of(context).accent,
       WorkspaceView.focus => TerminalPalette.of(context).doing,
@@ -660,7 +857,169 @@ class _TaskPanel extends ConsumerWidget {
             ? BorderRadius.circular(TerminalMetrics.panelRadius)
             : BorderRadius.circular(12),
       ),
-      child: content,
+      child: state.search == null
+          ? content
+          : Column(
+              children: [
+                const _SearchBar(),
+                Expanded(child: content),
+              ],
+            ),
+    );
+  }
+}
+
+class _SearchBar extends ConsumerStatefulWidget {
+  const _SearchBar();
+
+  @override
+  ConsumerState<_SearchBar> createState() => _SearchBarState();
+}
+
+class _SearchBarState extends ConsumerState<_SearchBar> {
+  final _controller = TextEditingController();
+  final _focusNode = FocusNode(debugLabel: 'workspace-search');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _focusNode.requestFocus(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _close() {
+    ref.read(workspaceViewModelProvider.notifier).closeSearch();
+  }
+
+  KeyEventResult _onKey(FocusNode _, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final vm = ref.read(workspaceViewModelProvider.notifier);
+    if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+      vm.moveSearch(-1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+      vm.moveSearch(1);
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      _close();
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter ||
+        event.logicalKey == LogicalKeyboardKey.numpadEnter) {
+      _close();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final search = ref.watch(workspaceViewModelProvider).search!;
+    final current = search.matchIds.isEmpty ? 0 : search.currentIndex + 1;
+    return Focus(
+      focusNode: _focusNode,
+      onKeyEvent: _onKey,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: TerminalMetrics.cell(context),
+          vertical: 2,
+        ),
+        child: Row(
+          children: [
+            Text('${AppLocalizations.of(context)!.search}: '),
+            Expanded(
+              child: TextField(
+                key: const ValueKey('workspace-search-field'),
+                controller: _controller,
+                autofocus: true,
+                style: _dialogInputStyle(context),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                ),
+                onChanged: ref
+                    .read(workspaceViewModelProvider.notifier)
+                    .updateSearch,
+                onSubmitted: (_) => _close(),
+              ),
+            ),
+            Text('$current/${search.matchIds.length} '),
+            _SearchControl(
+              label: '△',
+              tooltip: AppLocalizations.of(context)!.previousMatch,
+              onTap: () =>
+                  ref.read(workspaceViewModelProvider.notifier).moveSearch(-1),
+            ),
+            _SearchControl(
+              label: '▽',
+              tooltip: AppLocalizations.of(context)!.nextMatch,
+              onTap: () =>
+                  ref.read(workspaceViewModelProvider.notifier).moveSearch(1),
+            ),
+            _SearchControl(
+              label: '⨯',
+              tooltip: AppLocalizations.of(context)!.closeSearch,
+              onTap: _close,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SearchControl extends StatelessWidget {
+  const _SearchControl({
+    required this.label,
+    required this.tooltip,
+    required this.onTap,
+  });
+  final String label;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+    message: tooltip,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: TerminalMetrics.cell(context) / 2,
+        ),
+        child: Text(label),
+      ),
+    ),
+  );
+}
+
+class _SearchContent extends StatelessWidget {
+  const _SearchContent({required this.state});
+  final WorkspaceState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final tasks = searchTasks(state);
+    if (state.search!.query.isEmpty) {
+      return _EmptyState(AppLocalizations.of(context)!.typeToSearch);
+    }
+    if (tasks.isEmpty) {
+      return _EmptyState(AppLocalizations.of(context)!.noSearchMatches);
+    }
+    return _TaskScrollView(
+      indicatorColor: TerminalPalette.of(context).accent,
+      padding: TerminalMetrics.panelPadding(context),
+      children: [for (final task in tasks) _TaskRow(task: task, state: state)],
     );
   }
 }
@@ -1051,11 +1410,17 @@ class _TaskRow extends ConsumerWidget {
     final visibleTaskIds = selected ? state.visibleTaskIds : const <String>[];
     final done = task.status == TaskStatus.done;
     final animated = task.id == state.animatedTaskId;
+    final highlighted = state.highlightedTaskIds.contains(task.id);
+    final search = state.search;
     final title = _TaskTitle(
       value: task.title,
       selected: selected,
-      display: state.settings.longTitleDisplay,
+      display: state.search == null
+          ? state.settings.longTitleDisplay
+          : LongTitleDisplay.wrapAll,
       speed: state.settings.marqueeSpeedMs,
+      searchQuery: search?.query,
+      currentSearchMatch: search?.currentTaskId == task.id,
       style: TextStyle(
         color: selected
             ? TerminalPalette.of(context).background
@@ -1081,6 +1446,10 @@ class _TaskRow extends ConsumerWidget {
       child: InkWell(
         onTap: () =>
             ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
+        onDoubleTap: () async {
+          ref.read(workspaceViewModelProvider.notifier).selectTask(task.id);
+          await Clipboard.setData(ClipboardData(text: task.title));
+        },
         borderRadius: terminal ? BorderRadius.zero : BorderRadius.circular(5),
         child: AnimatedContainer(
           constraints: const BoxConstraints(),
@@ -1093,7 +1462,9 @@ class _TaskRow extends ConsumerWidget {
             vertical: terminal ? 1 : 9,
           ).add(EdgeInsets.only(left: terminal ? 0 : depth * 16.0)),
           decoration: BoxDecoration(
-            color: animated
+            color: highlighted
+                ? TerminalPalette.of(context).accent
+                : animated
                 ? _statusColor(context, task.status)
                 : selected
                 ? TerminalPalette.of(context).accent
@@ -1333,12 +1704,16 @@ class _TaskTitle extends StatefulWidget {
     required this.display,
     required this.speed,
     required this.style,
+    this.searchQuery,
+    this.currentSearchMatch = false,
   });
   final String value;
   final bool selected;
   final LongTitleDisplay display;
   final int speed;
   final TextStyle style;
+  final String? searchQuery;
+  final bool currentSearchMatch;
 
   @override
   State<_TaskTitle> createState() => _TaskTitleState();
@@ -1347,6 +1722,7 @@ class _TaskTitle extends StatefulWidget {
 class _TaskTitleState extends State<_TaskTitle> {
   Timer? _timer;
   var _offset = 0;
+  var _available = 0;
 
   @override
   void initState() {
@@ -1367,9 +1743,22 @@ class _TaskTitleState extends State<_TaskTitle> {
 
   void _configureTimer() {
     _timer?.cancel();
-    if (widget.selected && widget.display == LongTitleDisplay.marquee) {
-      _timer = Timer.periodic(Duration(milliseconds: widget.speed), (_) {
-        if (mounted) setState(() => _offset++);
+    if (!widget.selected || _available == 0) return;
+    if (widget.display == LongTitleDisplay.marquee ||
+        widget.display == LongTitleDisplay.slidingWindow) {
+      final stride = widget.display == LongTitleDisplay.slidingWindow
+          ? (_available - 5).clamp(1, _available)
+          : 1;
+      final interval = widget.display == LongTitleDisplay.slidingWindow
+          ? widget.speed * stride
+          : widget.speed;
+      _timer = Timer.periodic(Duration(milliseconds: interval), (_) {
+        if (!mounted) return;
+        final length = widget.value.characters.length;
+        final last = (length - _available).clamp(0, length);
+        setState(() {
+          _offset = _offset >= last ? 0 : (_offset + stride).clamp(0, last);
+        });
       });
     }
   }
@@ -1382,20 +1771,27 @@ class _TaskTitleState extends State<_TaskTitle> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.display == LongTitleDisplay.wrap) {
-      return Text(widget.value, style: widget.style);
+    if (widget.display == LongTitleDisplay.wrapAll ||
+        (widget.display == LongTitleDisplay.wrapSelected && widget.selected)) {
+      return _searchHighlightedTitle(context, widget.value, widget.style);
     }
     return LayoutBuilder(
       builder: (_, constraints) {
         final source = widget.value.replaceAll(RegExp(r'[\r\n]+'), ' ');
-        final characters = source.runes
-            .map(String.fromCharCode)
-            .toList(growable: false);
+        final characters = source.characters.toList(growable: false);
         final available = (constraints.maxWidth / TerminalMetrics.cell(context))
             .floor()
             .clamp(1, 10000)
             .toInt();
-        if (!widget.selected || characters.length <= available) {
+        if (_available != available) {
+          _available = available;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _configureTimer();
+          });
+        }
+        if (!widget.selected ||
+            characters.length <= available ||
+            characters.length <= 12) {
           return Text(
             source,
             maxLines: 1,
@@ -1403,14 +1799,15 @@ class _TaskTitleState extends State<_TaskTitle> {
             style: widget.style,
           );
         }
-        final loop = [
-          ...characters,
-          ...'   •   '.runes.map(String.fromCharCode),
-        ];
-        final text = List<String>.generate(
-          available,
-          (index) => loop[(_offset + index) % loop.length],
-        ).join();
+        final text = widget.display == LongTitleDisplay.slidingWindow
+            ? characters.skip(_offset).take(available).join()
+            : () {
+                final loop = [...characters, ...'   •   '.characters];
+                return List<String>.generate(
+                  available,
+                  (index) => loop[(_offset + index) % loop.length],
+                ).join();
+              }();
         return Text(
           text,
           maxLines: 1,
@@ -1419,6 +1816,42 @@ class _TaskTitleState extends State<_TaskTitle> {
         );
       },
     );
+  }
+
+  Widget _searchHighlightedTitle(
+    BuildContext context,
+    String value,
+    TextStyle style,
+  ) {
+    final query = widget.searchQuery;
+    if (query == null || query.isEmpty) return Text(value, style: style);
+    final lower = value.toLowerCase();
+    final needle = query.toLowerCase();
+    final spans = <InlineSpan>[];
+    var start = 0;
+    while (start < value.length) {
+      final match = lower.indexOf(needle, start);
+      if (match < 0) {
+        spans.add(TextSpan(text: value.substring(start)));
+        break;
+      }
+      if (match > start) {
+        spans.add(TextSpan(text: value.substring(start, match)));
+      }
+      spans.add(
+        TextSpan(
+          text: value.substring(match, match + needle.length),
+          style: style.copyWith(
+            color: TerminalPalette.of(context).background,
+            backgroundColor: widget.currentSearchMatch
+                ? TerminalPalette.of(context).pending
+                : TerminalPalette.of(context).doing,
+          ),
+        ),
+      );
+      start = match + needle.length;
+    }
+    return Text.rich(TextSpan(style: style, children: spans));
   }
 }
 
@@ -1516,7 +1949,7 @@ class _Footer extends ConsumerWidget {
                     .toggleMultiView,
               ),
               _TerminalCommand(
-                keys: 'tab',
+                keys: '←/→',
                 label: AppLocalizations.of(context)!.commandLists,
                 onTap: () =>
                     ref.read(workspaceViewModelProvider.notifier).cycleList(1),
@@ -2030,25 +2463,82 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
                 ),
               ),
               if (usesTerminalPresentation)
-                _TerminalToggle(
-                  value: settings.longTitleDisplay == LongTitleDisplay.wrap,
-                  onChanged: (_) => vm.updateSettings(
+                _TerminalCycleControl(
+                  label: AppLocalizations.of(context)!.longTitleMode,
+                  value: _longTitleLabel(
+                    AppLocalizations.of(context)!,
+                    settings.longTitleDisplay,
+                  ),
+                  onTap: () => vm.updateSettings(
                     settings.copyWith(
-                      longTitleDisplay: settings.longTitleDisplay.toggled,
+                      longTitleDisplay: settings.longTitleDisplay.next,
                     ),
                   ),
-                  label: AppLocalizations.of(context)!.wrapLongTitles,
                 )
               else
                 SwitchListTile(
-                  value: settings.longTitleDisplay == LongTitleDisplay.wrap,
-                  onChanged: (_) => vm.updateSettings(
+                  value: settings.longTitleDisplay == LongTitleDisplay.wrapAll,
+                  onChanged: (value) => vm.updateSettings(
                     settings.copyWith(
-                      longTitleDisplay: settings.longTitleDisplay.toggled,
+                      longTitleDisplay: value
+                          ? LongTitleDisplay.wrapAll
+                          : LongTitleDisplay.marquee,
                     ),
                   ),
                   title: Text(AppLocalizations.of(context)!.wrapLongTitles),
                 ),
+              if (usesTerminalPresentation)
+                _TerminalToggle(
+                  value: settings.tipsEnabled,
+                  onChanged: (value) =>
+                      vm.updateSettings(settings.copyWith(tipsEnabled: value)),
+                  label: AppLocalizations.of(context)!.showTips,
+                ),
+              if (usesTerminalPresentation)
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(AppLocalizations.of(context)!.rewardDuration),
+                  subtitle: Text(switch (settings.rewardDuration) {
+                    RewardDuration.short => AppLocalizations.of(
+                      context,
+                    )!.shortDuration,
+                    RewardDuration.medium => AppLocalizations.of(
+                      context,
+                    )!.mediumDuration,
+                    RewardDuration.long => AppLocalizations.of(
+                      context,
+                    )!.longDuration,
+                  }),
+                  onTap: () => vm.updateSettings(
+                    settings.copyWith(
+                      rewardDuration:
+                          RewardDuration.values[(settings.rewardDuration.index +
+                                  1) %
+                              RewardDuration.values.length],
+                    ),
+                  ),
+                ),
+              if (!kIsWeb && defaultTargetPlatform == TargetPlatform.linux) ...[
+                const Divider(),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(AppLocalizations.of(context)!.backgroundImage),
+                  subtitle: Text(
+                    ref
+                            .watch(workspaceViewModelProvider)
+                            .deviceState
+                            .desktopAppearance
+                            .backgroundImagePath ??
+                        AppLocalizations.of(context)!.none,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  onTap: () => showDialog<void>(
+                    context: context,
+                    builder: (_) => const _DesktopBackgroundDialog(),
+                  ),
+                ),
+              ],
               Text(
                 AppLocalizations.of(
                   context,
@@ -2150,6 +2640,138 @@ class _SettingsDialogState extends ConsumerState<_SettingsDialog> {
   }
 }
 
+class _DesktopBackgroundDialog extends ConsumerWidget {
+  const _DesktopBackgroundDialog();
+
+  Future<void> _pick(WidgetRef ref) async {
+    final path = await ref
+        .read(desktopBackgroundServiceProvider)
+        .pickImagePath();
+    if (path == null) return;
+    final appearance = ref
+        .read(workspaceViewModelProvider)
+        .deviceState
+        .desktopAppearance;
+    await ref
+        .read(workspaceViewModelProvider.notifier)
+        .updateDesktopAppearance(
+          appearance.copyWith(backgroundImagePath: path),
+        );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final appearance = ref
+        .watch(workspaceViewModelProvider)
+        .deviceState
+        .desktopAppearance;
+    final vm = ref.read(workspaceViewModelProvider.notifier);
+    return AlertDialog(
+      titlePadding: _dialogTitlePadding,
+      contentPadding: _dialogContentPadding,
+      title: Text(AppLocalizations.of(context)!.backgroundImage),
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                appearance.backgroundImagePath ??
+                    AppLocalizations.of(context)!.noImageSelected,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              onTap: () => _pick(ref),
+              trailing: TextButton(
+                onPressed: appearance.backgroundImagePath == null
+                    ? null
+                    : () => vm.updateDesktopAppearance(
+                        appearance.copyWith(clearBackgroundImage: true),
+                      ),
+                child: Text(AppLocalizations.of(context)!.clear),
+              ),
+            ),
+            Text(
+              '${AppLocalizations.of(context)!.backgroundOpacity}: '
+              '${(appearance.backgroundOverlayOpacity * 100).round()}%',
+            ),
+            Slider(
+              value: appearance.backgroundOverlayOpacity,
+              min: 0,
+              max: 1,
+              divisions: 20,
+              onChanged: (value) => vm.updateDesktopAppearance(
+                appearance.copyWith(backgroundOverlayOpacity: value),
+              ),
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(AppLocalizations.of(context)!.backgroundFit),
+              subtitle: Text(
+                appearance.backgroundFit == DesktopBackgroundFit.cover
+                    ? AppLocalizations.of(context)!.cover
+                    : AppLocalizations.of(context)!.contain,
+              ),
+              onTap: () => vm.updateDesktopAppearance(
+                appearance.copyWith(
+                  backgroundFit:
+                      appearance.backgroundFit == DesktopBackgroundFit.cover
+                      ? DesktopBackgroundFit.contain
+                      : DesktopBackgroundFit.cover,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(AppLocalizations.of(context)!.close),
+        ),
+      ],
+    );
+  }
+}
+
+class _TerminalCycleControl extends StatelessWidget {
+  const _TerminalCycleControl({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+  final String label;
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    button: true,
+    label: '$label: $value',
+    child: InkWell(
+      onTap: onTap,
+      child: SizedBox(
+        height: TerminalMetrics.line(context),
+        child: Row(
+          children: [
+            Text(
+              '< $value >',
+              style: TextStyle(
+                color: TerminalPalette.of(context).accent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(width: TerminalMetrics.cell(context)),
+            Text(label),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _TerminalToggle extends StatelessWidget {
   const _TerminalToggle({
     required this.value,
@@ -2219,6 +2841,32 @@ String _viewLabel(WorkspaceView view, AppLocalizations strings) =>
       WorkspaceView.focus => strings.doingFocus,
       WorkspaceView.completed => strings.completed,
       WorkspaceView.multi => strings.multiView,
+    };
+
+String _tipText(AppLocalizations strings, String id) => switch (id) {
+  'navigation' => strings.tipNavigation,
+  'reorder' => strings.tipReorder,
+  'subtasks' => strings.tipSubtasks,
+  'search' => strings.tipSearch,
+  'copy' => strings.tipCopy,
+  _ => '',
+};
+
+String _rewardText(AppLocalizations strings, int index) => switch (index % 6) {
+  0 => strings.rewardGreatWork,
+  1 => strings.rewardNicelyDone,
+  2 => strings.rewardKeepGoing,
+  3 => strings.rewardMomentum,
+  4 => strings.rewardTaskCleared,
+  _ => strings.rewardExcellent,
+};
+
+String _longTitleLabel(AppLocalizations strings, LongTitleDisplay display) =>
+    switch (display) {
+      LongTitleDisplay.wrapSelected => strings.wrapSelected,
+      LongTitleDisplay.wrapAll => strings.wrapAll,
+      LongTitleDisplay.slidingWindow => strings.slidingWindow,
+      LongTitleDisplay.marquee => strings.marquee,
     };
 
 String _statusLabel(TaskStatus status, AppLocalizations strings) =>

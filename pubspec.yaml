@@ -43,6 +43,8 @@ dependencies:
   path_provider: ^2.1.6
   uuid: ^4.6.0
   intl: any
+  characters: any
+  file_picker: ^10.3.10
 
 dev_dependencies:
   flutter_test:

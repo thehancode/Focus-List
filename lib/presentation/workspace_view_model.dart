@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -9,12 +10,43 @@ import '../domain/repositories.dart';
 
 enum WorkspacePhase { loading, ready, failure }
 
-enum WorkspaceView { list, focus, completed, multi }
-
 class NoticeState {
   const NoticeState(this.text, {this.error = false});
   final String text;
   final bool error;
+}
+
+class WorkspaceSearchState {
+  const WorkspaceSearchState({
+    this.query = '',
+    this.matchIds = const [],
+    this.currentIndex = 0,
+    required this.allLists,
+  });
+
+  final String query;
+  final List<String> matchIds;
+  final int currentIndex;
+  final bool allLists;
+
+  String? get currentTaskId => matchIds.isEmpty ? null : matchIds[currentIndex];
+
+  WorkspaceSearchState copyWith({
+    String? query,
+    List<String>? matchIds,
+    int? currentIndex,
+  }) => WorkspaceSearchState(
+    query: query ?? this.query,
+    matchIds: matchIds ?? this.matchIds,
+    currentIndex: currentIndex ?? this.currentIndex,
+    allLists: allLists,
+  );
+}
+
+class RewardState {
+  const RewardState(this.messageIndex, this.taskId);
+  final int messageIndex;
+  final String taskId;
 }
 
 class WorkspaceState {
@@ -30,6 +62,11 @@ class WorkspaceState {
     this.animatedTaskId,
     this.notice,
     this.error,
+    this.deviceState = const DeviceWorkspaceState(),
+    this.highlightedTaskIds = const {},
+    this.tipId,
+    this.reward,
+    this.search,
   });
 
   const WorkspaceState.loading()
@@ -43,7 +80,12 @@ class WorkspaceState {
       soundEnabled = true,
       animatedTaskId = null,
       notice = null,
-      error = null;
+      error = null,
+      deviceState = const DeviceWorkspaceState(),
+      highlightedTaskIds = const {},
+      tipId = null,
+      reward = null,
+      search = null;
 
   final WorkspacePhase phase;
   final List<TaskList> lists;
@@ -56,6 +98,11 @@ class WorkspaceState {
   final String? animatedTaskId;
   final NoticeState? notice;
   final String? error;
+  final DeviceWorkspaceState deviceState;
+  final Set<String> highlightedTaskIds;
+  final String? tipId;
+  final RewardState? reward;
+  final WorkspaceSearchState? search;
 
   WorkspaceState copyWith({
     WorkspacePhase? phase,
@@ -73,6 +120,14 @@ class WorkspaceState {
     bool clearNotice = false,
     String? error,
     bool clearError = false,
+    DeviceWorkspaceState? deviceState,
+    Set<String>? highlightedTaskIds,
+    String? tipId,
+    bool clearTip = false,
+    RewardState? reward,
+    bool clearReward = false,
+    WorkspaceSearchState? search,
+    bool clearSearch = false,
   }) => WorkspaceState(
     phase: phase ?? this.phase,
     lists: lists ?? this.lists,
@@ -90,6 +145,11 @@ class WorkspaceState {
         : (animatedTaskId ?? this.animatedTaskId),
     notice: clearNotice ? null : (notice ?? this.notice),
     error: clearError ? null : (error ?? this.error),
+    deviceState: deviceState ?? this.deviceState,
+    highlightedTaskIds: highlightedTaskIds ?? this.highlightedTaskIds,
+    tipId: clearTip ? null : (tipId ?? this.tipId),
+    reward: clearReward ? null : (reward ?? this.reward),
+    search: clearSearch ? null : (search ?? this.search),
   );
 }
 
@@ -268,19 +328,32 @@ final workspaceViewModelProvider =
       WorkspaceViewModel.new,
     );
 
+final workspaceRandomProvider = Provider<Random>((ref) => Random());
+
 class WorkspaceViewModel extends Notifier<WorkspaceState> {
   final _uuid = const Uuid();
   Timer? _noticeTimer;
   Timer? _animationTimer;
+  Timer? _deviceSaveTimer;
+  Timer? _highlightTimer;
+  Timer? _tipTimer;
+  Timer? _rewardTimer;
+  final List<_HistoryEntry> _history = [];
 
   TaskListRepository get _lists => ref.read(taskListRepositoryProvider);
   SettingsRepository get _settings => ref.read(settingsRepositoryProvider);
+  DeviceStateRepository get _device => ref.read(deviceStateRepositoryProvider);
+  Random get _random => ref.read(workspaceRandomProvider);
 
   @override
   WorkspaceState build() {
     ref.onDispose(() {
       _noticeTimer?.cancel();
       _animationTimer?.cancel();
+      _deviceSaveTimer?.cancel();
+      _highlightTimer?.cancel();
+      _tipTimer?.cancel();
+      _rewardTimer?.cancel();
     });
     Future<void>.microtask(initialize);
     return const WorkspaceState.loading();
@@ -290,6 +363,12 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     try {
       final loaded = await _lists.loadAll();
       final settings = await _settings.load();
+      DeviceWorkspaceState device;
+      try {
+        device = await _device.load();
+      } on Object {
+        device = const DeviceWorkspaceState();
+      }
       var lists = List<TaskList>.from(loaded.lists);
       if (lists.isEmpty) {
         final list = _newList('Tasks');
@@ -297,12 +376,21 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         lists = [list];
       }
       lists = await _resetExpiredDailyTasks(lists);
+      final restoredList = lists.any((list) => list.id == device.currentListId)
+          ? device.currentListId
+          : lists.first.id;
+      var restoredView = device.view;
+      if (restoredView != WorkspaceView.multi && restoredList == null) {
+        restoredView = WorkspaceView.list;
+      }
       final initial = WorkspaceState(
         phase: WorkspacePhase.ready,
         lists: lists,
         settings: settings,
-        view: WorkspaceView.list,
-        currentListId: lists.first.id,
+        view: restoredView,
+        currentListId: restoredList,
+        soundEnabled: device.soundEnabled,
+        deviceState: device,
         notice: loaded.warnings.isEmpty
             ? null
             : NoticeState(
@@ -312,7 +400,13 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
                 error: true,
               ),
       );
-      state = _withFirstVisibleSelected(initial);
+      final restoredSelection = initial.visibleTaskIds.contains(
+        device.selectedTaskId,
+      );
+      state = restoredSelection
+          ? initial.copyWith(selectedTaskId: device.selectedTaskId)
+          : _withFirstVisibleSelected(initial);
+      _showEntranceTipIfNeeded();
       if (loaded.warnings.isNotEmpty) _expireNotice(const Duration(seconds: 8));
     } on Object catch (error) {
       state = WorkspaceState(
@@ -414,6 +508,10 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
 
   void dismissNotice() => state = state.copyWith(clearNotice: true);
 
+  void reportBackgroundUnavailable() => _showNotice(
+    const NoticeState('Background image is unavailable', error: true),
+  );
+
   void selectTask(String taskId) {
     TaskList? owner;
     for (final list in state.lists) {
@@ -424,6 +522,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     }
     if (owner == null) return;
     state = state.copyWith(currentListId: owner.id, selectedTaskId: taskId);
+    _scheduleDeviceSave();
   }
 
   void moveSelection(int delta) {
@@ -446,6 +545,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       clearSelection: true,
     );
     state = _withFirstVisibleSelected(next);
+    _scheduleDeviceSave();
   }
 
   void cycleList(int direction) {
@@ -466,6 +566,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       clearSelection: true,
     );
     state = _withFirstVisibleSelected(next);
+    _scheduleDeviceSave();
   }
 
   void toggleFocusView() {
@@ -476,6 +577,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
           returnToMultiAfterFocus: false,
         ),
       );
+      _scheduleDeviceSave();
       return;
     }
     final current = state.currentList;
@@ -489,6 +591,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     state = _withFirstVisibleSelected(
       state.copyWith(view: WorkspaceView.focus, clearSelection: true),
     );
+    _scheduleDeviceSave();
   }
 
   void toggleCompletedView() {
@@ -501,6 +604,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         clearSelection: true,
       ),
     );
+    _scheduleDeviceSave();
   }
 
   Future<bool> createList(String input) async {
@@ -512,6 +616,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       return _error('A list with that name already exists');
     }
     final list = _newList(name);
+    final before = _captureHistory();
     try {
       await _lists.save(list);
       state = _withFirstVisibleSelected(
@@ -525,6 +630,8 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         ),
       );
       _expireNotice(const Duration(seconds: 2));
+      _pushHistory(before);
+      _scheduleDeviceSave();
       return true;
     } on Object catch (error) {
       return _error('List save failed: $error');
@@ -552,6 +659,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     }
     final current = state.currentList;
     if (current == null) return false;
+    final before = _captureHistory();
     try {
       await _lists.delete(current.id);
       final oldIndex = state.lists.indexWhere((list) => list.id == current.id);
@@ -570,6 +678,8 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         ),
       );
       _expireNotice(const Duration(seconds: 2));
+      _pushHistory(before);
+      _scheduleDeviceSave();
       return true;
     } on Object catch (error) {
       return _error('List delete failed: $error');
@@ -608,7 +718,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     return _saveList(
       list.copyWith(tasks: tasks),
       success: 'Subtask added',
-      selectedTaskId: task.id,
+      selectedTaskId: parent.id,
     );
   }
 
@@ -829,6 +939,64 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     if (success && view == WorkspaceView.multi && to == TaskStatus.done) {
       state = _withFirstVisibleSelected(state.copyWith(clearSelection: true));
     }
+    if (success && to == TaskStatus.done) _maybeShowReward(selected.id);
+    return success;
+  }
+
+  Future<bool> completeSelectedTask() async {
+    final list = state.selectedTaskList;
+    final selected = state.selectedTask;
+    if (list == null ||
+        selected == null ||
+        selected.status == TaskStatus.done) {
+      return false;
+    }
+    final now = DateTime.now().toUtc();
+    final completedIds = {
+      selected.id,
+      ...taskDescendants(list, selected).map((task) => task.id),
+    };
+    Task complete(Task task) {
+      final history = task.daily
+          ? [...task.completionHistory, now]
+          : task.completionHistory;
+      return task.copyWith(
+        status: TaskStatus.done,
+        updatedAt: now,
+        completedAt: now,
+        completionHistory: history,
+      );
+    }
+
+    final completedTasks = [
+      for (final task in list.tasks)
+        if (completedIds.contains(task.id)) complete(task) else task,
+    ];
+    var nextView = state.view;
+    var returnToMulti = state.returnToMultiAfterFocus;
+    if (state.view == WorkspaceView.focus) {
+      if (returnToMulti) {
+        nextView = WorkspaceView.multi;
+        returnToMulti = false;
+      } else if (!completedTasks.any(
+        (task) => task.parentId == null && task.status == TaskStatus.doing,
+      )) {
+        nextView = WorkspaceView.list;
+      }
+    }
+    final success = await _saveList(
+      list.copyWith(tasks: completedTasks),
+      success: '${selected.status.label} → Done',
+      view: nextView,
+      returnToMultiAfterFocus: returnToMulti,
+      animationTaskId: selected.id,
+    );
+    if (success) {
+      if (!state.visibleTaskIds.contains(state.selectedTaskId)) {
+        state = _withFirstVisibleSelected(state.copyWith(clearSelection: true));
+      }
+      _maybeShowReward(selected.id);
+    }
     return success;
   }
 
@@ -913,6 +1081,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       notice: NoticeState('Sound ${state.soundEnabled ? 'off' : 'on'}'),
     );
     _expireNotice(const Duration(seconds: 2));
+    _scheduleDeviceSave();
   }
 
   Future<void> updateSettings(AppSettings next) async {
@@ -923,6 +1092,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         notice: const NoticeState('Settings saved'),
       );
       _expireNotice(const Duration(seconds: 2));
+      if (!next.tipsEnabled) dismissTip();
     } on Object catch (error) {
       _error('Settings save failed: $error');
     }
@@ -936,6 +1106,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     bool? returnToMultiAfterFocus,
     String? animationTaskId,
   }) async {
+    final before = _captureHistory();
     try {
       await _lists.save(next);
       final lists = [
@@ -959,6 +1130,8 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         });
       }
       _expireNotice(const Duration(seconds: 2));
+      _pushHistory(before);
+      _scheduleDeviceSave();
       return true;
     } on Object catch (error) {
       return _error('Save failed: $error');
@@ -987,4 +1160,192 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     _noticeTimer?.cancel();
     _noticeTimer = Timer(duration, dismissNotice);
   }
+
+  Future<bool> undo() async {
+    if (_history.isEmpty) {
+      _showNotice(const NoticeState('Nothing to undo'));
+      return false;
+    }
+    final previous = _history.last;
+    final previousIds = previous.lists.map((list) => list.id).toSet();
+    final deletes = state.lists
+        .map((list) => list.id)
+        .where((id) => !previousIds.contains(id))
+        .toList(growable: false);
+    try {
+      await _lists.commit(
+        TaskListChangeSet(upserts: previous.lists, deletes: deletes),
+      );
+      _history.removeLast();
+      var restored = state.copyWith(
+        lists: previous.lists,
+        currentListId: previous.currentListId,
+        selectedTaskId: previous.selectedTaskId,
+        view: previous.view,
+        returnToMultiAfterFocus: previous.returnToMultiAfterFocus,
+        notice: const NoticeState('Undone'),
+        clearSearch: true,
+      );
+      if (!restored.visibleTaskIds.contains(restored.selectedTaskId)) {
+        restored = _withFirstVisibleSelected(restored);
+      }
+      state = restored;
+      _expireNotice(const Duration(seconds: 2));
+      _scheduleDeviceSave();
+      return true;
+    } on Object catch (error) {
+      return _error('Undo failed: $error');
+    }
+  }
+
+  void highlightTasks(Iterable<String> ids) {
+    _highlightTimer?.cancel();
+    state = state.copyWith(highlightedTaskIds: ids.toSet());
+    _highlightTimer = Timer(const Duration(milliseconds: 100), () {
+      state = state.copyWith(highlightedTaskIds: const {});
+    });
+  }
+
+  void openSearch() {
+    final search = WorkspaceSearchState(
+      allLists: state.view == WorkspaceView.multi,
+    );
+    state = state.copyWith(search: search);
+  }
+
+  void updateSearch(String query) {
+    final search = state.search;
+    if (search == null) return;
+    final needle = query.toLowerCase();
+    final lists = search.allLists
+        ? state.lists
+        : state.currentList == null
+        ? const <TaskList>[]
+        : [state.currentList!];
+    final matches = needle.isEmpty
+        ? const <String>[]
+        : [
+            for (final list in lists)
+              for (final task in list.tasks)
+                if (task.title.toLowerCase().contains(needle)) task.id,
+          ];
+    final next = search.copyWith(
+      query: query,
+      matchIds: matches,
+      currentIndex: 0,
+    );
+    state = state.copyWith(search: next);
+    final id = next.currentTaskId;
+    if (id != null) selectTask(id);
+  }
+
+  void moveSearch(int delta) {
+    final search = state.search;
+    if (search == null || search.matchIds.isEmpty) return;
+    final index = (search.currentIndex + delta) % search.matchIds.length;
+    final next = search.copyWith(currentIndex: index);
+    state = state.copyWith(search: next);
+    selectTask(next.currentTaskId!);
+  }
+
+  void closeSearch() => state = state.copyWith(clearSearch: true);
+
+  void dismissTip() {
+    _tipTimer?.cancel();
+    state = state.copyWith(clearTip: true);
+  }
+
+  Future<void> updateDesktopAppearance(DesktopAppearance appearance) async {
+    final device = state.deviceState.copyWith(desktopAppearance: appearance);
+    state = state.copyWith(deviceState: device);
+    try {
+      await _device.save(_currentDeviceState());
+    } on Object catch (error) {
+      _error('Device settings save failed: $error');
+    }
+  }
+
+  void _showEntranceTipIfNeeded() {
+    if (!state.settings.tipsEnabled) return;
+    const tipIds = ['navigation', 'reorder', 'subtasks', 'search', 'copy'];
+    final unseen = tipIds.where(
+      (id) => !state.deviceState.seenTipIds.contains(id),
+    );
+    if (unseen.isEmpty) return;
+    final id = unseen.first;
+    final seen = {...state.deviceState.seenTipIds, id};
+    state = state.copyWith(
+      tipId: id,
+      deviceState: state.deviceState.copyWith(seenTipIds: seen),
+    );
+    _scheduleDeviceSave(immediate: true);
+    _tipTimer = Timer(const Duration(seconds: 3), dismissTip);
+  }
+
+  void _maybeShowReward(String taskId) {
+    if (_random.nextDouble() >= .2) return;
+    final reward = RewardState(_random.nextInt(6), taskId);
+    state = state.copyWith(reward: reward);
+    _rewardTimer?.cancel();
+    _rewardTimer = Timer(state.settings.rewardDuration.duration, () {
+      state = state.copyWith(clearReward: true);
+    });
+  }
+
+  _HistoryEntry _captureHistory() => _HistoryEntry(
+    state.lists,
+    state.currentListId,
+    state.selectedTaskId,
+    state.view,
+    state.returnToMultiAfterFocus,
+  );
+
+  void _pushHistory(_HistoryEntry entry) {
+    _history.add(entry);
+    if (_history.length > 50) _history.removeAt(0);
+  }
+
+  DeviceWorkspaceState _currentDeviceState() => state.deviceState.copyWith(
+    view: state.view,
+    currentListId: state.currentListId,
+    selectedTaskId: state.selectedTaskId,
+    soundEnabled: state.soundEnabled,
+  );
+
+  void _scheduleDeviceSave({bool immediate = false}) {
+    _deviceSaveTimer?.cancel();
+    Future<void> save() async {
+      final device = _currentDeviceState();
+      state = state.copyWith(deviceState: device);
+      try {
+        await _device.save(device);
+      } on Object catch (error) {
+        _showNotice(
+          NoticeState('Device state save failed: $error', error: true),
+        );
+      }
+    }
+
+    if (immediate) {
+      unawaited(save());
+    } else {
+      _deviceSaveTimer = Timer(const Duration(milliseconds: 250), save);
+    }
+  }
+}
+
+class _HistoryEntry {
+  const _HistoryEntry(
+    this.lists,
+    this.currentListId,
+    this.selectedTaskId,
+    this.view,
+    this.returnToMultiAfterFocus,
+  );
+
+  final List<TaskList> lists;
+  final String? currentListId;
+  final String? selectedTaskId;
+  final WorkspaceView view;
+  final bool returnToMultiAfterFocus;
 }

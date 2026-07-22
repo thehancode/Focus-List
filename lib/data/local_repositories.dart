@@ -63,6 +63,16 @@ class LocalTaskListRepository implements TaskListRepository {
     await _store.writeTaskList(list.id, list.toJson());
   }
 
+  @override
+  Future<void> commit(TaskListChangeSet changes) async {
+    for (final list in changes.upserts) {
+      await save(list);
+    }
+    for (final id in changes.deletes) {
+      await delete(id);
+    }
+  }
+
   String _uniqueName(String requested, List<TaskList> existing) {
     if (!existing.any(
       (list) => list.name.toLowerCase() == requested.toLowerCase(),
@@ -77,6 +87,26 @@ class LocalTaskListRepository implements TaskListRepository {
         return candidate;
       }
     }
+  }
+}
+
+class LocalDeviceStateRepository implements DeviceStateRepository {
+  LocalDeviceStateRepository(this._store);
+
+  final PlatformLocalStore _store;
+
+  @override
+  Future<DeviceWorkspaceState> load() async {
+    final raw = await _store.readDeviceState();
+    return raw == null
+        ? const DeviceWorkspaceState()
+        : DeviceWorkspaceState.fromJson(raw);
+  }
+
+  @override
+  Future<void> save(DeviceWorkspaceState state) async {
+    state.desktopAppearance.validate();
+    await _store.writeDeviceState(state.toJson());
   }
 }
 

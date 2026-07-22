@@ -1,0 +1,425 @@
+{
+  "schema_version": 1,
+  "id": "4151ab37-25d6-4580-adfd-6fabe7a60cc1",
+  "name": "Focus List",
+  "created_at": "2026-07-18T19:41:44.448324Z",
+  "tasks": [
+    {
+      "id": "195e5aa5-3d90-4eb2-8415-55e5b35600f4",
+      "title": "change wrap line toggle setting to a button that cycles four modes \"Wrap selected\"(new behavior when no wrap is set the only line no wrap should be the seletcted one), \"Wrap all\", \"Sliding window\" (like the marquee but mutiply the time by (characters per line ) - (overlapping (lets say 5 characters ex: Implement a very lon ry long task descri escription that mus t must be completed))) and the classic \"Marquee\"",
+      "status": "pending",
+      "created_at": "2026-07-21T17:37:01.539567Z",
+      "updated_at": "2026-07-21T17:37:01.539567Z"
+    },
+    {
+      "id": "228d5877-d66c-4410-ae16-388298838f45",
+      "title": "change background (only in linux and windows version), define a file from the pc and also a selector for the opacity of the bacground (the background color should be over the background image and have a transparency) with two options for fit Cover Fills the container completely; parts may be cropped ✓ Contain / Fit Entire image is visible; may leave empty bars ✓",
+      "status": "pending",
+      "created_at": "2026-07-21T17:26:25.789424Z",
+      "updated_at": "2026-07-21T17:26:25.789424Z"
+    },
+    {
+      "id": "d628253f-6459-4285-9baa-6437c59ab279",
+      "title": "add help Notifications on entrance, this shoudl not be blocking and can be seen in a tips seccion, also in config there should be an option for disable the tips",
+      "status": "pending",
+      "created_at": "2026-07-21T17:13:28.206213Z",
+      "updated_at": "2026-07-21T17:14:29.584538Z"
+    },
+    {
+      "id": "47a53085-8510-4d8f-8d7d-53e85eb2c66c",
+      "title": "fix marquee ending limit, marquee is cutting at 39 characters,at 25p",
+      "status": "pending",
+      "created_at": "2026-07-21T17:05:58.506168Z",
+      "updated_at": "2026-07-21T17:05:58.506168Z"
+    },
+    {
+      "id": "dc5f84eb-0b0d-4afe-83c1-b567633a95be",
+      "title": "fix marquee ending limit, marquee is cutting at 39 characters",
+      "status": "pending",
+      "created_at": "2026-07-21T17:03:08.856025Z",
+      "updated_at": "2026-07-21T17:05:40.385029Z"
+    },
+    {
+      "id": "10f3de06-f997-435e-b87a-03e622cff1af",
+      "title": "ctrl shift c should copy an ai compatible json format of the elements of the current section (for example if im in pending should copy all of the pending tasks and its tags) also should flash a selection color for all the lines involved (flash the color of selection for 0.1 seconds)",
+      "status": "pending",
+      "created_at": "2026-07-21T16:50:25.504453Z",
+      "updated_at": "2026-07-21T16:50:25.504453Z"
+    },
+    {
+      "id": "c0e40b9d-6c9c-45dc-827f-ed06dd98970b",
+      "title": "add ctrl z acction support",
+      "status": "pending",
+      "created_at": "2026-07-21T16:45:15.122523Z",
+      "updated_at": "2026-07-21T16:45:15.122523Z"
+    },
+    {
+      "id": "792c20b0-f796-45e0-8871-bd24e8951e6e",
+      "title": "persist the state of the user per device (last type of view, last item selected,last list viewed)",
+      "status": "pending",
+      "created_at": "2026-07-21T16:44:45.810269Z",
+      "updated_at": "2026-07-21T16:44:45.810269Z"
+    },
+    {
+      "id": "a3337f78-5175-41f7-8199-efffdad27c04",
+      "title": "completing a task should have a reward screen for 0.8 seconds (configurable long, medium and short), the completing should appear randomly (for now random uniform distribution with 0.2 probability is ok)",
+      "status": "pending",
+      "created_at": "2026-07-21T16:41:58.612351Z",
+      "updated_at": "2026-07-21T16:41:58.612351Z"
+    },
+    {
+      "id": "8853c535-d784-40c3-8bf1-a66c58010e54",
+      "title": "space space should pass the task to done directly (from pending to done) (also in focus mode)",
+      "status": "pending",
+      "created_at": "2026-07-21T16:36:06.328971Z",
+      "updated_at": "2026-07-21T16:36:06.328971Z"
+    },
+    {
+      "id": "d868c2c6-2c8f-4a9d-8537-440e3dfd6604",
+      "title": "change the tab to cycle list (tab should add a subtask) left/right shoudl cycle the list",
+      "status": "pending",
+      "created_at": "2026-07-21T16:29:08.794089Z",
+      "updated_at": "2026-07-21T16:33:35.857457Z"
+    },
+    {
+      "id": "df1c018a-ae6a-413c-8662-0ecb91f7b544",
+      "title": "auto build on github with tags",
+      "status": "pending",
+      "created_at": "2026-07-20T02:34:18.670517Z",
+      "updated_at": "2026-07-20T02:34:18.670517Z"
+    },
+    {
+      "id": "ee63970d-78e1-4c6a-bfff-e45190a31608",
+      "title": "after creating new subtask selection should be kept to the parent",
+      "status": "pending",
+      "created_at": "2026-07-20T02:31:36.826263Z",
+      "updated_at": "2026-07-20T02:41:23.561612Z"
+    },
+    {
+      "id": "1b95d7ea-623b-4359-8400-d0ce413051c0",
+      "title": "new task box should be empty",
+      "status": "pending",
+      "created_at": "2026-07-19T23:47:08.219769Z",
+      "updated_at": "2026-07-19T23:47:08.219769Z"
+    },
+    {
+      "id": "79989c30-1bf6-4daf-8d1b-18c945452700",
+      "title": "add double click and ctrl c for copying",
+      "status": "pending",
+      "created_at": "2026-07-19T23:46:35.545536Z",
+      "updated_at": "2026-07-21T16:45:49.368204Z"
+    },
+    {
+      "id": "c28f1e7c-45f3-4081-ae75-b43ac0b17eff",
+      "title": "add multi search for all lists",
+      "status": "pending",
+      "created_at": "2026-07-19T18:01:41.430680Z",
+      "updated_at": "2026-07-19T18:14:42.231569Z",
+      "tags": [
+        "spade"
+      ]
+    },
+    {
+      "id": "1f1b4dce-0f85-4078-b69b-0afb65520db7",
+      "title": "add search for one tasklist, ctrl+f or / should add a line at the top \"Search:\" at the rigth side of this line shoudl be 1/20 △▽⨯ the △▽⨯ should be clickable (prev, next and close search), while this window is open the matches shoudl be highligted (cyan background) for now just change the view mode to wrap line while searching in order for all the matches to be visible the current match should be amber bg, the up/down arrows moves to the prev/next matches, when a match is selected the task selection is the match task",
+      "status": "pending",
+      "created_at": "2026-07-19T18:01:25.862430Z",
+      "updated_at": "2026-07-22T02:53:16.031516Z",
+      "tags": [
+        "spade"
+      ]
+    },
+    {
+      "id": "6c870bcf-18d4-4346-9601-594d1b5ae6aa",
+      "title": "create a good tag configuration menu",
+      "status": "pending",
+      "created_at": "2026-07-19T17:11:14.969540Z",
+      "updated_at": "2026-07-19T18:14:36.090069Z",
+      "tags": [
+        "heart"
+      ]
+    },
+    {
+      "id": "45c8ad78-e143-4e9d-a6fa-7ee844336903",
+      "title": "make the program have better defaults in all platforms",
+      "status": "pending",
+      "created_at": "2026-07-19T15:56:43.438244Z",
+      "updated_at": "2026-07-19T18:13:34.438446Z",
+      "tags": [
+        "heart"
+      ]
+    },
+    {
+      "id": "c4fcc922-7738-4322-be58-cd5e24901320",
+      "title": "test general web feel",
+      "status": "pending",
+      "created_at": "2026-07-20T02:36:24.152234Z",
+      "updated_at": "2026-07-20T02:36:24.152234Z",
+      "parent_id": "45c8ad78-e143-4e9d-a6fa-7ee844336903"
+    },
+    {
+      "id": "d131e4f8-1f83-428a-995f-12b0d6e03fb8",
+      "title": "better opening position",
+      "status": "pending",
+      "created_at": "2026-07-20T02:30:31.216273Z",
+      "updated_at": "2026-07-20T02:30:31.216273Z",
+      "parent_id": "45c8ad78-e143-4e9d-a6fa-7ee844336903"
+    },
+    {
+      "id": "4c2cc174-98e5-4abd-a630-fddbe7923300",
+      "title": "better default text size",
+      "status": "pending",
+      "created_at": "2026-07-20T02:30:02.606610Z",
+      "updated_at": "2026-07-20T02:30:02.606610Z",
+      "parent_id": "45c8ad78-e143-4e9d-a6fa-7ee844336903"
+    },
+    {
+      "id": "6db0cae4-e2f5-4768-9558-e4f77cb5965c",
+      "title": "make the footer nicer",
+      "status": "pending",
+      "created_at": "2026-07-19T05:17:41.375188Z",
+      "updated_at": "2026-07-19T18:13:12.792160Z",
+      "tags": [
+        "heart"
+      ]
+    },
+    {
+      "id": "15e2e4e3-2f17-4f2b-81cd-0a1bcb82f8ae",
+      "title": "show contextual info",
+      "status": "pending",
+      "created_at": "2026-07-20T02:31:06.560739Z",
+      "updated_at": "2026-07-20T02:31:06.560739Z",
+      "parent_id": "6db0cae4-e2f5-4768-9558-e4f77cb5965c"
+    },
+    {
+      "id": "ace8b7c0-470a-434e-b013-b754f5d30670",
+      "title": "create extension for having it as a side panel in the browser",
+      "status": "pending",
+      "created_at": "2026-07-19T16:42:49.702417Z",
+      "updated_at": "2026-07-19T18:14:19.236303Z",
+      "tags": [
+        "club"
+      ]
+    },
+    {
+      "id": "595ccf55-a75e-4d83-b20f-af285ff653b0",
+      "title": "create google sync proyect",
+      "status": "pending",
+      "created_at": "2026-07-18T19:42:13.388487Z",
+      "updated_at": "2026-07-20T00:15:26.995631Z",
+      "tags": [
+        "club"
+      ]
+    },
+    {
+      "id": "b4093cc5-e4fa-4de0-bc2d-4acf6a061423",
+      "title": "add multilingual support",
+      "status": "done",
+      "created_at": "2026-07-18T20:03:37.485139Z",
+      "updated_at": "2026-07-19T18:24:24.154044Z",
+      "completed_at": "2026-07-19T18:24:24.154044Z"
+    },
+    {
+      "id": "f43abc63-1143-4495-a5fc-14d172b49870",
+      "title": "implement google auth in the desktop app",
+      "status": "pending",
+      "created_at": "2026-07-18T19:42:39.091842Z",
+      "updated_at": "2026-07-19T18:12:21.963855Z",
+      "tags": [
+        "club"
+      ]
+    },
+    {
+      "id": "5c49efc3-6d0a-4b8a-bf8f-2763f4ebff2f",
+      "title": "create a backend service",
+      "status": "pending",
+      "created_at": "2026-07-18T19:42:52.351112Z",
+      "updated_at": "2026-07-19T18:12:24.530595Z",
+      "tags": [
+        "club"
+      ]
+    },
+    {
+      "id": "f9734069-b790-419c-bd87-d86ea8aa8a6a",
+      "title": "install flutter",
+      "status": "done",
+      "created_at": "2026-07-18T21:21:34.544354Z",
+      "updated_at": "2026-07-19T16:00:15.747274Z",
+      "completed_at": "2026-07-19T16:00:15.747274Z"
+    },
+    {
+      "id": "fd75719d-8aef-4891-9729-97917742e500",
+      "title": "create the prompts for the flutter migration",
+      "status": "done",
+      "created_at": "2026-07-18T23:23:28.013328Z",
+      "updated_at": "2026-07-19T05:15:41.193833Z",
+      "completed_at": "2026-07-19T05:15:41.193833Z"
+    },
+    {
+      "id": "d46c5f6b-0e76-41ac-a266-2e6d41166bfb",
+      "title": "test the flutter migration in the three versions",
+      "status": "done",
+      "created_at": "2026-07-18T23:23:45.756611Z",
+      "updated_at": "2026-07-19T05:15:35.478910Z",
+      "completed_at": "2026-07-19T05:15:35.478910Z"
+    },
+    {
+      "id": "7083a86b-3c1a-4cef-99e7-f9edf0838bee",
+      "title": "create a backend container",
+      "status": "pending",
+      "created_at": "2026-07-18T19:43:00.511611Z",
+      "updated_at": "2026-07-19T18:12:26.759378Z",
+      "tags": [
+        "club"
+      ]
+    },
+    {
+      "id": "2f13f6ad-cb36-457d-9b1e-7cee0cca6b14",
+      "title": "persist window position",
+      "status": "done",
+      "created_at": "2026-07-19T14:47:31.629380Z",
+      "updated_at": "2026-07-19T15:55:10.912264Z",
+      "completed_at": "2026-07-19T15:55:10.912264Z"
+    },
+    {
+      "id": "e90326cf-eaf5-4b57-92cd-4ec99cd2e8aa",
+      "title": "upload the backend to the cloud service",
+      "status": "pending",
+      "created_at": "2026-07-18T19:43:20.356759Z",
+      "updated_at": "2026-07-19T18:12:30.829731Z",
+      "tags": [
+        "club"
+      ]
+    },
+    {
+      "id": "5e8fef3a-567b-4d3e-8510-839a4b3b1d5e",
+      "title": "add a nice readme",
+      "status": "pending",
+      "created_at": "2026-07-18T19:44:14.132397Z",
+      "updated_at": "2026-07-19T23:48:02.870343Z",
+      "tags": [
+        "diamond"
+      ]
+    },
+    {
+      "id": "53be3a98-7d66-4fc5-a98a-c5aad65e89db",
+      "title": "add tag support",
+      "status": "done",
+      "created_at": "2026-07-19T16:01:05.387376Z",
+      "updated_at": "2026-07-19T17:10:46.595047Z",
+      "completed_at": "2026-07-19T17:10:46.595047Z"
+    },
+    {
+      "id": "718c2276-d918-4c41-9983-c4a908f4f7ed",
+      "title": "do marketing for the app",
+      "status": "pending",
+      "created_at": "2026-07-18T19:44:20.569458Z",
+      "updated_at": "2026-07-19T18:12:55.063104Z",
+      "tags": [
+        "diamond"
+      ]
+    },
+    {
+      "id": "13684c70-ff47-4735-a00e-0f6e1686e2ff",
+      "title": "add multi theme support",
+      "status": "done",
+      "created_at": "2026-07-18T20:04:00.687452Z",
+      "updated_at": "2026-07-20T02:28:17.021433Z",
+      "completed_at": "2026-07-20T02:28:17.021433Z",
+      "tags": [
+        "spade"
+      ]
+    },
+    {
+      "id": "4fb914fc-807a-4745-9554-5dff166e9b5a",
+      "title": "themes: dracula,grubox,tokio-nigth,catpucchin/ligth,oxocarbon/light",
+      "status": "done",
+      "created_at": "2026-07-19T16:48:48.384456Z",
+      "updated_at": "2026-07-20T02:28:26.290105Z",
+      "completed_at": "2026-07-20T02:28:26.290105Z",
+      "tags": [
+        "spade"
+      ]
+    },
+    {
+      "id": "ea5f1dd2-9c3d-4ed7-af1c-1f0514afbc9f",
+      "title": "add subtask support",
+      "status": "done",
+      "created_at": "2026-07-19T15:58:33.079588Z",
+      "updated_at": "2026-07-20T01:48:57.130921Z",
+      "completed_at": "2026-07-20T01:48:57.130921Z",
+      "tags": [
+        "spade"
+      ]
+    },
+    {
+      "id": "12cd9022-c555-4fc0-bb3d-b05428b7d01b",
+      "title": "add subtask supportsdjfk",
+      "status": "done",
+      "created_at": "2026-07-20T01:48:40.190700Z",
+      "updated_at": "2026-07-20T01:48:57.130921Z",
+      "completed_at": "2026-07-20T01:48:57.130921Z",
+      "parent_id": "ea5f1dd2-9c3d-4ed7-af1c-1f0514afbc9f"
+    },
+    {
+      "id": "b043f784-e5a9-4701-907e-16d8e62ffe18",
+      "title": "add subtask supportra",
+      "status": "done",
+      "created_at": "2026-07-20T01:48:22.912349Z",
+      "updated_at": "2026-07-20T01:48:57.130921Z",
+      "completed_at": "2026-07-20T01:48:57.130921Z",
+      "parent_id": "ea5f1dd2-9c3d-4ed7-af1c-1f0514afbc9f"
+    },
+    {
+      "id": "8e59aaff-f333-4d90-9b86-eda438140147",
+      "title": "add subtask supportra",
+      "status": "done",
+      "created_at": "2026-07-20T01:48:34.497177Z",
+      "updated_at": "2026-07-20T01:48:57.130921Z",
+      "completed_at": "2026-07-20T01:48:57.130921Z",
+      "parent_id": "b043f784-e5a9-4701-907e-16d8e62ffe18"
+    },
+    {
+      "id": "80fac52c-f4af-4547-9b5d-f2fe3da9b39b",
+      "title": "test subtask support",
+      "status": "done",
+      "created_at": "2026-07-20T01:36:21.733661Z",
+      "updated_at": "2026-07-20T01:48:57.130921Z",
+      "completed_at": "2026-07-20T01:48:57.130921Z",
+      "parent_id": "ea5f1dd2-9c3d-4ed7-af1c-1f0514afbc9f"
+    },
+    {
+      "id": "618037e9-f917-4d11-8407-f25e73ce6271",
+      "title": "check multinesting",
+      "status": "done",
+      "created_at": "2026-07-20T01:41:24.656519Z",
+      "updated_at": "2026-07-20T01:48:57.130921Z",
+      "completed_at": "2026-07-20T01:48:57.130921Z",
+      "parent_id": "80fac52c-f4af-4547-9b5d-f2fe3da9b39b"
+    },
+    {
+      "id": "7a9b63f0-a896-4fb2-8416-e6ae977aac07",
+      "title": "understand how the data is flowing for making the change of the subtask",
+      "status": "done",
+      "created_at": "2026-07-19T23:49:31.097142Z",
+      "updated_at": "2026-07-20T01:49:04.671770Z",
+      "completed_at": "2026-07-20T01:49:04.671770Z"
+    },
+    {
+      "id": "c9ad4e1a-8cbf-477f-a146-19f179b80797",
+      "title": "new tasks should spawn at the top of the list",
+      "status": "done",
+      "created_at": "2026-07-19T18:02:34.733686Z",
+      "updated_at": "2026-07-19T18:24:22.086051Z",
+      "completed_at": "2026-07-19T18:24:22.086051Z"
+    },
+    {
+      "id": "21e4252c-cb54-4a64-a021-a4cb773d707f",
+      "title": "in multi view border yellow but list name should be purple",
+      "status": "done",
+      "created_at": "2026-07-19T18:11:40.342739Z",
+      "updated_at": "2026-07-19T18:44:10.702981Z",
+      "completed_at": "2026-07-19T18:44:10.702981Z"
+    }
+  ]
+}

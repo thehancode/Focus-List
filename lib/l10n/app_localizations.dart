@@ -223,7 +223,7 @@ abstract class AppLocalizations {
   /// Multiline desktop shortcut reference. Keep key glyphs and line breaks.
   ///
   /// In en, this message translates to:
-  /// **'↑/↓ or J/K   Move selection\nSpace then F   Advance status\nSpace then ↑/↓   Reorder task/subtree\nN / A / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nT / Shift+T   Cycle first / second tag\nTab / Shift+Tab   Switch task lists\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
+  /// **'↑/↓ or J/K   Move selection\n←/→   Switch task lists\nSpace then F   Advance status\nSpace then Space   Complete subtree\nSpace then ↑/↓   Reorder task/subtree\nN / Tab / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nW / Shift+W   Cycle first / second tag\nCtrl+C   Copy task title\nCtrl+Shift+C   Copy current section\nCtrl+F or /   Search\nCtrl+Z   Undo\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
   String get keyboardShortcutsHelp;
 
   /// Fallback workspace loading error.
@@ -561,6 +561,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Language: {language}'**
   String languageValue(Object language);
+
+  /// Setting that enables brief startup tips.
+  ///
+  /// In en, this message translates to:
+  /// **'Show entrance tips'**
+  String get showTips;
+
+  /// Setting that controls how long completion rewards remain visible.
+  ///
+  /// In en, this message translates to:
+  /// **'Reward duration'**
+  String get rewardDuration;
+
+  /// Heading for the complete list of usage tips.
+  ///
+  /// In en, this message translates to:
+  /// **'Tips'**
+  String get tipsTitle;
+
+  /// Tip explaining list navigation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use left and right to switch task lists.'**
+  String get tipNavigation;
+
+  /// Tip explaining keyboard reordering.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Space, then up or down, to reorder a task subtree.'**
+  String get tipReorder;
+
+  /// Tip explaining subtask creation.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Tab to add a subtask to the selected task.'**
+  String get tipSubtasks;
+
+  /// Tip explaining task search.
+  ///
+  /// In en, this message translates to:
+  /// **'Press Ctrl+F or / to search tasks.'**
+  String get tipSearch;
+
+  /// Tip explaining clipboard shortcuts.
+  ///
+  /// In en, this message translates to:
+  /// **'Ctrl+C copies one title; Ctrl+Shift+C copies its section.'**
+  String get tipCopy;
+
+  /// Brief task-completion celebration.
+  ///
+  /// In en, this message translates to:
+  /// **'Great work!'**
+  String get rewardGreatWork;
+
+  /// Brief task-completion celebration.
+  ///
+  /// In en, this message translates to:
+  /// **'Nicely done!'**
+  String get rewardNicelyDone;
+
+  /// Brief task-completion encouragement.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep going!'**
+  String get rewardKeepGoing;
+
+  /// Brief task-completion encouragement.
+  ///
+  /// In en, this message translates to:
+  /// **'Momentum gained!'**
+  String get rewardMomentum;
+
+  /// Brief task-completion celebration.
+  ///
+  /// In en, this message translates to:
+  /// **'Task cleared!'**
+  String get rewardTaskCleared;
+
+  /// Brief task-completion celebration.
+  ///
+  /// In en, this message translates to:
+  /// **'Excellent!'**
+  String get rewardExcellent;
+
+  /// Label for the task search input.
+  ///
+  /// In en, this message translates to:
+  /// **'Search'**
+  String get search;
+
+  /// Tooltip for navigating to the previous search match.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous match'**
+  String get previousMatch;
+
+  /// Tooltip for navigating to the next search match.
+  ///
+  /// In en, this message translates to:
+  /// **'Next match'**
+  String get nextMatch;
+
+  /// Tooltip for closing task search.
+  ///
+  /// In en, this message translates to:
+  /// **'Close search'**
+  String get closeSearch;
+
+  /// Empty state before entering a search query.
+  ///
+  /// In en, this message translates to:
+  /// **'Type to search'**
+  String get typeToSearch;
+
+  /// Empty state when task search has no matches.
+  ///
+  /// In en, this message translates to:
+  /// **'No matches'**
+  String get noSearchMatches;
+
+  /// Settings label for long task-title presentation.
+  ///
+  /// In en, this message translates to:
+  /// **'Long-title mode'**
+  String get longTitleMode;
+
+  /// Long-title mode that wraps only the selected task.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap selected'**
+  String get wrapSelected;
+
+  /// Long-title mode that wraps all tasks.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrap all'**
+  String get wrapAll;
+
+  /// Long-title mode that advances overlapping text windows.
+  ///
+  /// In en, this message translates to:
+  /// **'Sliding window'**
+  String get slidingWindow;
+
+  /// Long-title mode that scrolls one character at a time.
+  ///
+  /// In en, this message translates to:
+  /// **'Marquee'**
+  String get marquee;
+
+  /// Short completion-reward duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Short'**
+  String get shortDuration;
+
+  /// Medium completion-reward duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Medium'**
+  String get mediumDuration;
+
+  /// Long completion-reward duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Long'**
+  String get longDuration;
+
+  /// Linux setting and dialog title for a workspace background image.
+  ///
+  /// In en, this message translates to:
+  /// **'Background image'**
+  String get backgroundImage;
+
+  /// Linux background overlay opacity label.
+  ///
+  /// In en, this message translates to:
+  /// **'Background color opacity'**
+  String get backgroundOpacity;
+
+  /// Linux background image fitting control.
+  ///
+  /// In en, this message translates to:
+  /// **'Image fit'**
+  String get backgroundFit;
+
+  /// Image fit mode that fills and may crop.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get cover;
+
+  /// Image fit mode that displays the entire image.
+  ///
+  /// In en, this message translates to:
+  /// **'Contain'**
+  String get contain;
+
+  /// Linux background dialog state with no selected image.
+  ///
+  /// In en, this message translates to:
+  /// **'No image selected'**
+  String get noImageSelected;
+
+  /// Short empty-value label.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get none;
+
+  /// Button that removes the selected background image.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clear;
 
   /// Native name of this locale, shown in the language selector.
   ///

@@ -5,12 +5,16 @@ PlatformLocalStore createPlatformLocalStore() => _MemoryStore();
 class _MemoryStore implements PlatformLocalStore {
   final Map<String, Map<String, Object?>> _lists = {};
   Map<String, Object?>? _settings;
+  Map<String, Object?>? _deviceState;
 
   @override
   Future<void> deleteTaskList(String id) async => _lists.remove(id);
 
   @override
   Future<Map<String, Object?>?> readSettings() async => _settings;
+
+  @override
+  Future<Map<String, Object?>?> readDeviceState() async => _deviceState;
 
   @override
   Future<List<StoredDocument>> readTaskLists() async => _lists.entries
@@ -25,6 +29,11 @@ class _MemoryStore implements PlatformLocalStore {
   @override
   Future<void> writeSettings(Map<String, Object?> value) async {
     _settings = Map<String, Object?>.from(value);
+  }
+
+  @override
+  Future<void> writeDeviceState(Map<String, Object?> value) async {
+    _deviceState = Map<String, Object?>.from(value);
   }
 
   @override

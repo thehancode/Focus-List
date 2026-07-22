@@ -37,16 +37,29 @@ abstract final class TerminalMetrics {
   static double renderedFontSize(BuildContext context) =>
       MediaQuery.textScalerOf(context).scale(fontSize(context));
 
-  /// Ubuntu Mono is approximately 0.61 em wide.
-  static double cell(BuildContext context) =>
-      (renderedFontSize(context) * .61).clamp(6, double.infinity);
+  static double cell(BuildContext context) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: 'M',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontFamily: 'UbuntuMonoNerd'),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    return painter.width.clamp(1, double.infinity);
+  }
 
   /// Measure the font's real line box instead of approximating it from points.
   static double line(BuildContext context) {
     final painter = TextPainter(
       text: TextSpan(
         text: '█Mg',
-        style: Theme.of(context).textTheme.bodyMedium,
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(fontFamily: 'UbuntuMonoNerd'),
       ),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),

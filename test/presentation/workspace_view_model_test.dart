@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -137,9 +139,12 @@ void main() {
       expect(await vm.createSubtask('Child'), isTrue);
       final child = repository.lists.single.tasks[1];
       expect(child.parentId, 'root');
+      expect(container.read(workspaceViewModelProvider).selectedTaskId, 'root');
+      vm.selectTask(child.id);
       expect(await vm.createSubtask('Grandchild'), isTrue);
       final grandchild = repository.lists.single.tasks[2];
       expect(grandchild.parentId, child.id);
+      vm.selectTask(grandchild.id);
       expect(await vm.createSubtask('Too deep'), isFalse);
 
       vm.selectTask('root');
@@ -267,17 +272,120 @@ void main() {
       ]);
     },
   );
+
+  test('direct completion completes a subtree and undo restores it', () async {
+    final list = _list('tasks', 'Tasks', [
+      _task('root', 'Root'),
+      _task('child', 'Child', parentId: 'root'),
+    ]);
+    final repository = _TaskLists([list]);
+    final container = _container([list], repository: repository);
+    addTearDown(container.dispose);
+    final vm = await _ready(container);
+
+    expect(await vm.completeSelectedTask(), isTrue);
+    expect(
+      repository.lists.single.tasks.map((task) => task.status),
+      everyElement(TaskStatus.done),
+    );
+
+    expect(await vm.undo(), isTrue);
+    expect(
+      repository.lists.single.tasks.map((task) => task.status),
+      everyElement(TaskStatus.pending),
+    );
+    expect(container.read(workspaceViewModelProvider).selectedTaskId, 'root');
+  });
+
+  test(
+    'search includes collapsed descendants and retains selected match',
+    () async {
+      final list = _list('tasks', 'Tasks', [
+        _task('root', 'Root').copyWith(collapsed: true),
+        _task('child', 'Hidden Needle', parentId: 'root'),
+        _task('other', 'Another needle'),
+      ]);
+      final container = _container([list]);
+      addTearDown(container.dispose);
+      final vm = await _ready(container);
+
+      vm.openSearch();
+      vm.updateSearch('NEEDLE');
+      var state = container.read(workspaceViewModelProvider);
+      expect(state.search!.matchIds, ['child', 'other']);
+      expect(state.selectedTaskId, 'child');
+
+      vm.moveSearch(1);
+      vm.closeSearch();
+      state = container.read(workspaceViewModelProvider);
+      expect(state.search, isNull);
+      expect(state.selectedTaskId, 'other');
+      expect(state.currentList!.tasks.first.collapsed, isTrue);
+    },
+  );
+
+  test('valid per-device view, list, and selection are restored', () async {
+    final first = _list('one', 'One', [_task('one-task', 'One')]);
+    final second = _list('two', 'Two', [_task('two-task', 'Two')]);
+    final device = _RecordingDeviceState(
+      const DeviceWorkspaceState(
+        currentListId: 'two',
+        selectedTaskId: 'two-task',
+        soundEnabled: false,
+      ),
+    );
+    final container = _container([first, second], device: device);
+    addTearDown(container.dispose);
+    await _ready(container);
+
+    final state = container.read(workspaceViewModelProvider);
+    expect(state.currentListId, 'two');
+    expect(state.selectedTaskId, 'two-task');
+    expect(state.soundEnabled, isFalse);
+  });
+
+  test('completion rewards use the injectable random source', () async {
+    final list = _list('tasks', 'Tasks', [_task('task', 'Task')]);
+    final container = _container([list], random: _FixedRandom());
+    addTearDown(container.dispose);
+    final vm = await _ready(container);
+
+    expect(await vm.completeSelectedTask(), isTrue);
+    final reward = container.read(workspaceViewModelProvider).reward;
+    expect(reward, isNotNull);
+    expect(reward!.messageIndex, 2);
+    expect(reward.taskId, 'task');
+  });
+
+  test('one unseen entrance tip is recorded per device', () async {
+    final list = _list('tasks', 'Tasks', [_task('task', 'Task')]);
+    final device = _RecordingDeviceState(const DeviceWorkspaceState());
+    final container = _container([list], device: device);
+    addTearDown(container.dispose);
+    await _ready(container);
+    await Future<void>.delayed(Duration.zero);
+
+    final state = container.read(workspaceViewModelProvider);
+    expect(state.tipId, 'navigation');
+    expect(device.state.seenTipIds, contains('navigation'));
+  });
 }
 
 ProviderContainer _container(
   List<TaskList> lists, {
   TaskListRepository? repository,
+  DeviceStateRepository? device,
+  Random? random,
 }) => ProviderContainer(
   overrides: [
+    deviceStateRepositoryProvider.overrideWithValue(
+      device ?? const _DeviceState(),
+    ),
     taskListRepositoryProvider.overrideWithValue(
       repository ?? _TaskLists(lists),
     ),
     settingsRepositoryProvider.overrideWithValue(_Settings()),
+    if (random != null) workspaceRandomProvider.overrideWithValue(random),
   ],
 );
 
@@ -328,6 +436,16 @@ class _TaskLists implements TaskListRepository {
   List<TaskList> lists;
 
   @override
+  Future<void> commit(TaskListChangeSet changes) async {
+    for (final list in changes.upserts) {
+      await save(list);
+    }
+    for (final id in changes.deletes) {
+      await delete(id);
+    }
+  }
+
+  @override
   Future<void> delete(String listId) async {
     lists = lists.where((list) => list.id != listId).toList(growable: false);
   }
@@ -357,4 +475,36 @@ class _Settings implements SettingsRepository {
   Future<void> save(AppSettings value) async {
     settings = value;
   }
+}
+
+class _DeviceState implements DeviceStateRepository {
+  const _DeviceState();
+
+  @override
+  Future<DeviceWorkspaceState> load() async => const DeviceWorkspaceState();
+
+  @override
+  Future<void> save(DeviceWorkspaceState state) async {}
+}
+
+class _RecordingDeviceState implements DeviceStateRepository {
+  _RecordingDeviceState(this.state);
+  DeviceWorkspaceState state;
+
+  @override
+  Future<DeviceWorkspaceState> load() async => state;
+
+  @override
+  Future<void> save(DeviceWorkspaceState value) async => state = value;
+}
+
+class _FixedRandom implements Random {
+  @override
+  bool nextBool() => true;
+
+  @override
+  double nextDouble() => 0;
+
+  @override
+  int nextInt(int max) => 2 % max;
 }

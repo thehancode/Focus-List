@@ -22,6 +22,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(_Lists()),
           settingsRepositoryProvider.overrideWithValue(_Settings()),
         ],
@@ -58,6 +59,9 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
+            deviceStateRepositoryProvider.overrideWithValue(
+              const _DeviceState(),
+            ),
             taskListRepositoryProvider.overrideWithValue(_Lists()),
             settingsRepositoryProvider.overrideWithValue(_Settings()),
           ],
@@ -96,6 +100,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(
             _Lists([list, secondList]),
           ),
@@ -141,6 +146,9 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: [
+              deviceStateRepositoryProvider.overrideWithValue(
+                const _DeviceState(),
+              ),
               taskListRepositoryProvider.overrideWithValue(
                 _Lists(
                   _listsWithManyTasks(
@@ -290,6 +298,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(_Lists()),
           settingsRepositoryProvider.overrideWithValue(const _Settings()),
         ],
@@ -349,12 +358,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(_Lists([list])),
           settingsRepositoryProvider.overrideWithValue(
             _Settings(
               const AppSettings(
                 nativeFontSize: 28,
-                longTitleDisplay: LongTitleDisplay.wrap,
+                longTitleDisplay: LongTitleDisplay.wrapAll,
               ),
             ),
           ),
@@ -385,6 +395,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(
             _Lists([_listWithTask()]),
           ),
@@ -461,6 +472,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(repository),
           settingsRepositoryProvider.overrideWithValue(const _Settings()),
         ],
@@ -495,12 +507,13 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(_Lists([list])),
           settingsRepositoryProvider.overrideWithValue(
             _Settings(
               const AppSettings(
                 nativeFontSize: 28,
-                longTitleDisplay: LongTitleDisplay.wrap,
+                longTitleDisplay: LongTitleDisplay.wrapAll,
               ),
             ),
           ),
@@ -534,6 +547,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(
             _Lists([_listWithTask()]),
           ),
@@ -557,6 +571,124 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('terminal search navigates matches and Enter keeps selection', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final now = DateTime.utc(2026, 1, 1);
+    Task task(String id, String title) => Task(
+      id: id,
+      title: title,
+      status: TaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+    );
+    final list = TaskList(
+      schemaVersion: currentSchemaVersion,
+      id: 'search-list',
+      name: 'Search',
+      createdAt: now,
+      tasks: [task('alpha', 'Needle alpha'), task('beta', 'Needle beta')],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    final field = find.byKey(const ValueKey('workspace-search-field'));
+    expect(field, findsOneWidget);
+    await tester.enterText(field, 'needle');
+    await tester.pump();
+    expect(find.text('1/2 '), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    expect(find.text('2/2 '), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+
+    expect(field, findsNothing);
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.selected == true &&
+            widget.properties.label?.contains('Needle beta') == true,
+      ),
+      findsOneWidget,
+    );
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('terminal copy shortcuts use title and indented section text', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    String? clipboardText;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          clipboardText =
+              (call.arguments as Map<Object?, Object?>)['text'] as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([
+              _listWithTask(tags: const [TaskTag.heart]),
+            ]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(clipboardText, 'Swipe me');
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyC);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    expect(clipboardText, 'Swipe me ▲');
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('configured tag names update task semantics', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
@@ -565,6 +697,7 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
           taskListRepositoryProvider.overrideWithValue(
             _Lists([
               _listWithTask(tags: const [TaskTag.heart]),
@@ -655,6 +788,16 @@ class _Lists implements TaskListRepository {
   final List<TaskList> _lists;
 
   @override
+  Future<void> commit(TaskListChangeSet changes) async {
+    for (final list in changes.upserts) {
+      await save(list);
+    }
+    for (final id in changes.deletes) {
+      await delete(id);
+    }
+  }
+
+  @override
   Future<void> delete(String listId) async {
     _lists.removeWhere((list) => list.id == listId);
   }
@@ -679,4 +822,14 @@ class _Settings implements SettingsRepository {
 
   @override
   Future<void> save(AppSettings settings) async {}
+}
+
+class _DeviceState implements DeviceStateRepository {
+  const _DeviceState();
+
+  @override
+  Future<DeviceWorkspaceState> load() async => const DeviceWorkspaceState();
+
+  @override
+  Future<void> save(DeviceWorkspaceState state) async {}
 }

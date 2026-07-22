@@ -10,6 +10,7 @@ PlatformLocalStore createPlatformLocalStore() => _IoLocalStore();
 
 class _IoLocalStore implements PlatformLocalStore {
   static const _settingsRelativePath = 'config/settings.json';
+  static const _deviceStateRelativePath = 'config/device-state.json';
 
   Future<Directory> _root() async {
     if (Platform.isLinux) {
@@ -29,6 +30,11 @@ class _IoLocalStore implements PlatformLocalStore {
     return File(path.join(root.path, _settingsRelativePath));
   }
 
+  Future<File> _deviceStateFile() async {
+    final root = await _root();
+    return File(path.join(root.path, _deviceStateRelativePath));
+  }
+
   @override
   Future<void> deleteTaskList(String id) async {
     final root = await _root();
@@ -39,6 +45,13 @@ class _IoLocalStore implements PlatformLocalStore {
   @override
   Future<Map<String, Object?>?> readSettings() async {
     final file = await _settingsFile();
+    if (!await file.exists()) return null;
+    return _decode(await file.readAsString(), file.path);
+  }
+
+  @override
+  Future<Map<String, Object?>?> readDeviceState() async {
+    final file = await _deviceStateFile();
     if (!await file.exists()) return null;
     return _decode(await file.readAsString(), file.path);
   }
@@ -71,6 +84,11 @@ class _IoLocalStore implements PlatformLocalStore {
   Future<void> writeSettings(Map<String, Object?> value) async {
     final file = await _settingsFile();
     await _writeAtomically(file, value);
+  }
+
+  @override
+  Future<void> writeDeviceState(Map<String, Object?> value) async {
+    await _writeAtomically(await _deviceStateFile(), value);
   }
 
   @override

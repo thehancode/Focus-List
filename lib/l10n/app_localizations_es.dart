@@ -73,7 +73,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get keyboardShortcutsHelp =>
-      '↑/↓ o J/K   Mover selección\nEspacio y F   Avanzar estado\nEspacio y ↑/↓   Reordenar por estado\nN / E / D / X   Crear, editar, duplicar, eliminar tarea\nT / Mayús+T   Cambiar primera / segunda etiqueta\nTab / Mayús+Tab   Cambiar listas de tareas\nCtrl+A   Vista múltiple\nCtrl+N   Nueva lista\nF2 / Ctrl+R   Renombrar lista\nCtrl+X   Eliminar lista\nC   Enfoque en curso\nV   Historial completado\nG   Ajustes\nS   Sonido\nQ   Salir';
+      '↑/↓ o J/K   Mover selección\n←/→   Cambiar listas\nEspacio y F   Avanzar estado\nEspacio y Espacio   Completar árbol\nEspacio y ↑/↓   Reordenar tarea\nN / Tab / E / D / X   Crear, subtarea, editar, duplicar, eliminar\nH   Contraer / expandir subtareas\nW / Mayús+W   Cambiar etiquetas\nCtrl+C   Copiar título\nCtrl+Mayús+C   Copiar sección\nCtrl+F o /   Buscar\nCtrl+Z   Deshacer\nCtrl+A   Vista múltiple\nCtrl+N   Nueva lista\nF2 / Ctrl+R   Renombrar lista\nCtrl+X   Eliminar lista\nC   Enfoque en curso\nV   Historial completado\nG   Ajustes\nS   Sonido\nQ   Salir';
 
   @override
   String get couldNotLoad => 'No se pudo cargar la lista de enfoque';
@@ -263,6 +263,117 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get showTips => 'Mostrar consejos al inicio';
+
+  @override
+  String get rewardDuration => 'Duración de recompensa';
+
+  @override
+  String get tipsTitle => 'Consejos';
+
+  @override
+  String get tipNavigation => 'Usa izquierda y derecha para cambiar de lista.';
+
+  @override
+  String get tipReorder =>
+      'Pulsa Espacio y después arriba o abajo para reordenar una tarea.';
+
+  @override
+  String get tipSubtasks =>
+      'Pulsa Tab para añadir una subtarea a la tarea seleccionada.';
+
+  @override
+  String get tipSearch => 'Pulsa Ctrl+F o / para buscar tareas.';
+
+  @override
+  String get tipCopy =>
+      'Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.';
+
+  @override
+  String get rewardGreatWork => '¡Gran trabajo!';
+
+  @override
+  String get rewardNicelyDone => '¡Bien hecho!';
+
+  @override
+  String get rewardKeepGoing => '¡Sigue así!';
+
+  @override
+  String get rewardMomentum => '¡Buen ritmo!';
+
+  @override
+  String get rewardTaskCleared => '¡Tarea completada!';
+
+  @override
+  String get rewardExcellent => '¡Excelente!';
+
+  @override
+  String get search => 'Buscar';
+
+  @override
+  String get previousMatch => 'Coincidencia anterior';
+
+  @override
+  String get nextMatch => 'Coincidencia siguiente';
+
+  @override
+  String get closeSearch => 'Cerrar búsqueda';
+
+  @override
+  String get typeToSearch => 'Escribe para buscar';
+
+  @override
+  String get noSearchMatches => 'Sin coincidencias';
+
+  @override
+  String get longTitleMode => 'Modo de títulos largos';
+
+  @override
+  String get wrapSelected => 'Ajustar seleccionado';
+
+  @override
+  String get wrapAll => 'Ajustar todos';
+
+  @override
+  String get slidingWindow => 'Ventana deslizante';
+
+  @override
+  String get marquee => 'Marquesina';
+
+  @override
+  String get shortDuration => 'Corta';
+
+  @override
+  String get mediumDuration => 'Media';
+
+  @override
+  String get longDuration => 'Larga';
+
+  @override
+  String get backgroundImage => 'Imagen de fondo';
+
+  @override
+  String get backgroundOpacity => 'Opacidad del color de fondo';
+
+  @override
+  String get backgroundFit => 'Ajuste de imagen';
+
+  @override
+  String get cover => 'Cubrir';
+
+  @override
+  String get contain => 'Contener';
+
+  @override
+  String get noImageSelected => 'Sin imagen seleccionada';
+
+  @override
+  String get none => 'Ninguna';
+
+  @override
+  String get clear => 'Quitar';
+
+  @override
   String get languageName => 'Español';
 }
 
@@ -335,7 +446,7 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
 
   @override
   String get keyboardShortcutsHelp =>
-      '↑/↓ o J/K   Mover selección\nEspacio y F   Avanzar estado\nEspacio y ↑/↓   Reordenar por estado\nN / E / D / X   Crear, editar, duplicar, eliminar tarea\nT / Mayús+T   Cambiar primera / segunda etiqueta\nTab / Mayús+Tab   Cambiar listas de tareas\nCtrl+A   Vista múltiple\nCtrl+N   Nueva lista\nF2 / Ctrl+R   Renombrar lista\nCtrl+X   Eliminar lista\nC   Enfoque en curso\nV   Historial completado\nG   Configuración\nS   Sonido\nQ   Salir';
+      '↑/↓ o J/K   Mover selección\n←/→   Cambiar listas\nEspacio y F   Avanzar estado\nEspacio y Espacio   Completar árbol\nEspacio y ↑/↓   Reordenar tarea\nN / Tab / E / D / X   Crear, subtarea, editar, duplicar, eliminar\nH   Contraer / expandir subtareas\nW / Mayús+W   Cambiar etiquetas\nCtrl+C   Copiar título\nCtrl+Mayús+C   Copiar sección\nCtrl+F o /   Buscar\nCtrl+Z   Deshacer\nCtrl+A   Vista múltiple\nCtrl+N   Nueva lista\nF2 / Ctrl+R   Renombrar lista\nCtrl+X   Eliminar lista\nC   Enfoque en curso\nV   Historial completado\nG   Configuración\nS   Sonido\nQ   Salir';
 
   @override
   String get couldNotLoad => 'No se pudo cargar Focus List';
@@ -525,6 +636,117 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   }
 
   @override
+  String get showTips => 'Mostrar consejos al inicio';
+
+  @override
+  String get rewardDuration => 'Duración de recompensa';
+
+  @override
+  String get tipsTitle => 'Consejos';
+
+  @override
+  String get tipNavigation => 'Usa izquierda y derecha para cambiar de lista.';
+
+  @override
+  String get tipReorder =>
+      'Presiona Espacio y luego arriba o abajo para reordenar una tarea.';
+
+  @override
+  String get tipSubtasks =>
+      'Presiona Tab para agregar una subtarea a la tarea seleccionada.';
+
+  @override
+  String get tipSearch => 'Presiona Ctrl+F o / para buscar tareas.';
+
+  @override
+  String get tipCopy =>
+      'Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.';
+
+  @override
+  String get rewardGreatWork => '¡Gran trabajo!';
+
+  @override
+  String get rewardNicelyDone => '¡Bien hecho!';
+
+  @override
+  String get rewardKeepGoing => '¡Sigue así!';
+
+  @override
+  String get rewardMomentum => '¡Buen ritmo!';
+
+  @override
+  String get rewardTaskCleared => '¡Tarea completada!';
+
+  @override
+  String get rewardExcellent => '¡Excelente!';
+
+  @override
+  String get search => 'Buscar';
+
+  @override
+  String get previousMatch => 'Coincidencia anterior';
+
+  @override
+  String get nextMatch => 'Coincidencia siguiente';
+
+  @override
+  String get closeSearch => 'Cerrar búsqueda';
+
+  @override
+  String get typeToSearch => 'Escribe para buscar';
+
+  @override
+  String get noSearchMatches => 'Sin coincidencias';
+
+  @override
+  String get longTitleMode => 'Modo de títulos largos';
+
+  @override
+  String get wrapSelected => 'Ajustar seleccionado';
+
+  @override
+  String get wrapAll => 'Ajustar todos';
+
+  @override
+  String get slidingWindow => 'Ventana deslizante';
+
+  @override
+  String get marquee => 'Marquesina';
+
+  @override
+  String get shortDuration => 'Corta';
+
+  @override
+  String get mediumDuration => 'Media';
+
+  @override
+  String get longDuration => 'Larga';
+
+  @override
+  String get backgroundImage => 'Imagen de fondo';
+
+  @override
+  String get backgroundOpacity => 'Opacidad del color de fondo';
+
+  @override
+  String get backgroundFit => 'Ajuste de imagen';
+
+  @override
+  String get cover => 'Cubrir';
+
+  @override
+  String get contain => 'Contener';
+
+  @override
+  String get noImageSelected => 'Sin imagen seleccionada';
+
+  @override
+  String get none => 'Ninguna';
+
+  @override
+  String get clear => 'Quitar';
+
+  @override
   String get languageName => 'Español Latino';
 }
 
@@ -597,7 +819,7 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
 
   @override
   String get keyboardShortcutsHelp =>
-      '↑/↓ o J/K   Mover selección\nEspacio y F   Avanzar estado\nEspacio y ↑/↓   Reordenar por estado\nN / E / D / X   Crear, editar, duplicar, eliminar tarea\nT / Mayús+T   Cambiar primera / segunda etiqueta\nTab / Mayús+Tab   Cambiar listas de tareas\nCtrl+A   Vista múltiple\nCtrl+N   Nueva lista\nF2 / Ctrl+R   Renombrar lista\nCtrl+X   Eliminar lista\nC   Enfoque en curso\nV   Historial completado\nG   Ajustes\nS   Sonido\nQ   Salir';
+      '↑/↓ o J/K   Mover selección\n←/→   Cambiar listas\nEspacio y F   Avanzar estado\nEspacio y Espacio   Completar árbol\nEspacio y ↑/↓   Reordenar tarea\nN / Tab / E / D / X   Crear, subtarea, editar, duplicar, eliminar\nH   Contraer / expandir subtareas\nW / Mayús+W   Cambiar etiquetas\nCtrl+C   Copiar título\nCtrl+Mayús+C   Copiar sección\nCtrl+F o /   Buscar\nCtrl+Z   Deshacer\nCtrl+A   Vista múltiple\nCtrl+N   Nueva lista\nF2 / Ctrl+R   Renombrar lista\nCtrl+X   Eliminar lista\nC   Enfoque en curso\nV   Historial completado\nG   Ajustes\nS   Sonido\nQ   Salir';
 
   @override
   String get couldNotLoad => 'No se pudo cargar Focus List';
@@ -785,6 +1007,117 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   String languageValue(Object language) {
     return 'Idioma: $language';
   }
+
+  @override
+  String get showTips => 'Mostrar consejos al inicio';
+
+  @override
+  String get rewardDuration => 'Duración de recompensa';
+
+  @override
+  String get tipsTitle => 'Consejos';
+
+  @override
+  String get tipNavigation => 'Usa izquierda y derecha para cambiar de lista.';
+
+  @override
+  String get tipReorder =>
+      'Pulsa Espacio y después arriba o abajo para reordenar una tarea.';
+
+  @override
+  String get tipSubtasks =>
+      'Pulsa Tab para añadir una subtarea a la tarea seleccionada.';
+
+  @override
+  String get tipSearch => 'Pulsa Ctrl+F o / para buscar tareas.';
+
+  @override
+  String get tipCopy =>
+      'Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.';
+
+  @override
+  String get rewardGreatWork => '¡Gran trabajo!';
+
+  @override
+  String get rewardNicelyDone => '¡Bien hecho!';
+
+  @override
+  String get rewardKeepGoing => '¡Sigue así!';
+
+  @override
+  String get rewardMomentum => '¡Buen ritmo!';
+
+  @override
+  String get rewardTaskCleared => '¡Tarea completada!';
+
+  @override
+  String get rewardExcellent => '¡Excelente!';
+
+  @override
+  String get search => 'Buscar';
+
+  @override
+  String get previousMatch => 'Coincidencia anterior';
+
+  @override
+  String get nextMatch => 'Coincidencia siguiente';
+
+  @override
+  String get closeSearch => 'Cerrar búsqueda';
+
+  @override
+  String get typeToSearch => 'Escribe para buscar';
+
+  @override
+  String get noSearchMatches => 'Sin coincidencias';
+
+  @override
+  String get longTitleMode => 'Modo de títulos largos';
+
+  @override
+  String get wrapSelected => 'Ajustar seleccionado';
+
+  @override
+  String get wrapAll => 'Ajustar todos';
+
+  @override
+  String get slidingWindow => 'Ventana deslizante';
+
+  @override
+  String get marquee => 'Marquesina';
+
+  @override
+  String get shortDuration => 'Corta';
+
+  @override
+  String get mediumDuration => 'Media';
+
+  @override
+  String get longDuration => 'Larga';
+
+  @override
+  String get backgroundImage => 'Imagen de fondo';
+
+  @override
+  String get backgroundOpacity => 'Opacidad del color de fondo';
+
+  @override
+  String get backgroundFit => 'Ajuste de imagen';
+
+  @override
+  String get cover => 'Cubrir';
+
+  @override
+  String get contain => 'Contener';
+
+  @override
+  String get noImageSelected => 'Sin imagen seleccionada';
+
+  @override
+  String get none => 'Ninguna';
+
+  @override
+  String get clear => 'Quitar';
 
   @override
   String get languageName => 'Español (España)';

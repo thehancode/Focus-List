@@ -52,6 +52,19 @@ class _WebLocalStore implements PlatformLocalStore {
   }
 
   @override
+  Future<Map<String, Object?>?> readDeviceState() async {
+    final transaction = (await _open()).transaction(
+      _settingsStore,
+      idbModeReadOnly,
+    );
+    final value = await transaction
+        .objectStore(_settingsStore)
+        .getObject('device_state');
+    await transaction.completed;
+    return value == null ? null : Map<String, Object?>.from(value as Map);
+  }
+
+  @override
   Future<List<StoredDocument>> readTaskLists() async {
     final transaction = (await _open()).transaction(
       _listsStore,
@@ -82,6 +95,16 @@ class _WebLocalStore implements PlatformLocalStore {
       idbModeReadWrite,
     );
     await transaction.objectStore(_settingsStore).put(value, 'settings');
+    await transaction.completed;
+  }
+
+  @override
+  Future<void> writeDeviceState(Map<String, Object?> value) async {
+    final transaction = (await _open()).transaction(
+      _settingsStore,
+      idbModeReadWrite,
+    );
+    await transaction.objectStore(_settingsStore).put(value, 'device_state');
     await transaction.completed;
   }
 

@@ -14,4 +14,6 @@ abstract interface class PlatformLocalStore {
   Future<void> deleteTaskList(String id);
   Future<Map<String, Object?>?> readSettings();
   Future<void> writeSettings(Map<String, Object?> value);
+  Future<Map<String, Object?>?> readDeviceState();
+  Future<void> writeDeviceState(Map<String, Object?> value);
 }

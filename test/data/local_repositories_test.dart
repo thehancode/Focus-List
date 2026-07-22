@@ -60,6 +60,25 @@ void main() {
     expect((tasks.first as Map)['collapsed'], isTrue);
     expect((tasks.last as Map)['parent_id'], 'root');
   });
+
+  test('device state persists independently from portable settings', () async {
+    final store = _MemoryStore(const []);
+    final repository = LocalDeviceStateRepository(store);
+    const state = DeviceWorkspaceState(
+      view: WorkspaceView.focus,
+      currentListId: 'list',
+      selectedTaskId: 'task',
+      seenTipIds: {'search'},
+    );
+
+    await repository.save(state);
+    final restored = await repository.load();
+
+    expect(restored.view, WorkspaceView.focus);
+    expect(restored.selectedTaskId, 'task');
+    expect(restored.seenTipIds, {'search'});
+    expect(store.settings, isNull);
+  });
 }
 
 Map<String, Object?> _taskJson(
@@ -93,12 +112,16 @@ class _MemoryStore implements PlatformLocalStore {
 
   final Map<String, Map<String, Object?>> documents = {};
   Map<String, Object?>? settings;
+  Map<String, Object?>? deviceState;
 
   @override
   Future<void> deleteTaskList(String id) async => documents.remove(id);
 
   @override
   Future<Map<String, Object?>?> readSettings() async => settings;
+
+  @override
+  Future<Map<String, Object?>?> readDeviceState() async => deviceState;
 
   @override
   Future<List<StoredDocument>> readTaskLists() async => documents.entries
@@ -113,6 +136,11 @@ class _MemoryStore implements PlatformLocalStore {
   @override
   Future<void> writeSettings(Map<String, Object?> value) async {
     settings = Map<String, Object?>.from(value);
+  }
+
+  @override
+  Future<void> writeDeviceState(Map<String, Object?> value) async {
+    deviceState = Map<String, Object?>.from(value);
   }
 
   @override

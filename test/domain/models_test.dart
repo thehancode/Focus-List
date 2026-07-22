@@ -133,6 +133,49 @@ void main() {
     const settings = AppSettings(tagNames: TagNames(heart: '   '));
     expect(settings.validate, throwsFormatException);
   });
+
+  test('new settings preserve legacy long-title values and defaults', () {
+    final legacyWrap = AppSettings.fromJson({'long_title_display': 'wrap'});
+    expect(legacyWrap.longTitleDisplay, LongTitleDisplay.wrapAll);
+    expect(legacyWrap.tipsEnabled, isTrue);
+    expect(legacyWrap.rewardDuration, RewardDuration.medium);
+
+    final settings = AppSettings.fromJson({
+      'long_title_display': 'slidingWindow',
+      'tips_enabled': false,
+      'reward_duration': 'long',
+    });
+    expect(settings.longTitleDisplay, LongTitleDisplay.slidingWindow);
+    expect(settings.tipsEnabled, isFalse);
+    expect(
+      settings.rewardDuration.duration,
+      const Duration(milliseconds: 1400),
+    );
+  });
+
+  test('device workspace state and desktop appearance round trip', () {
+    const state = DeviceWorkspaceState(
+      view: WorkspaceView.multi,
+      currentListId: 'list',
+      selectedTaskId: 'task',
+      soundEnabled: false,
+      seenTipIds: {'search', 'copy'},
+      desktopAppearance: DesktopAppearance(
+        backgroundImagePath: '/tmp/background.png',
+        backgroundOverlayOpacity: .4,
+        backgroundFit: DesktopBackgroundFit.contain,
+      ),
+    );
+    final restored = DeviceWorkspaceState.fromJson(state.toJson());
+    expect(restored.view, WorkspaceView.multi);
+    expect(restored.selectedTaskId, 'task');
+    expect(restored.seenTipIds, {'search', 'copy'});
+    expect(restored.desktopAppearance.backgroundOverlayOpacity, .4);
+    expect(
+      restored.desktopAppearance.backgroundFit,
+      DesktopBackgroundFit.contain,
+    );
+  });
 }
 
 Map<String, Object?> _taskJson() => {

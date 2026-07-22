@@ -51,20 +51,165 @@ extension TaskStatusX on TaskStatus {
   };
 }
 
-enum LongTitleDisplay { marquee, wrap }
+enum WorkspaceView { list, focus, completed, multi }
+
+enum LongTitleDisplay { wrapSelected, wrapAll, slidingWindow, marquee }
 
 extension LongTitleDisplayX on LongTitleDisplay {
   String get wireName => name;
-  String get label => this == LongTitleDisplay.marquee ? 'Marquee' : 'Wrap';
-  LongTitleDisplay get toggled => this == LongTitleDisplay.marquee
-      ? LongTitleDisplay.wrap
-      : LongTitleDisplay.marquee;
+  String get label => switch (this) {
+    LongTitleDisplay.wrapSelected => 'Wrap selected',
+    LongTitleDisplay.wrapAll => 'Wrap all',
+    LongTitleDisplay.slidingWindow => 'Sliding window',
+    LongTitleDisplay.marquee => 'Marquee',
+  };
+
+  LongTitleDisplay get next =>
+      LongTitleDisplay.values[(index + 1) % LongTitleDisplay.values.length];
 
   static LongTitleDisplay fromWireName(Object? value) => switch (value) {
     null || 'marquee' => LongTitleDisplay.marquee,
-    'wrap' => LongTitleDisplay.wrap,
+    'wrap' || 'wrapAll' => LongTitleDisplay.wrapAll,
+    'wrapSelected' => LongTitleDisplay.wrapSelected,
+    'slidingWindow' => LongTitleDisplay.slidingWindow,
     _ => throw FormatException('Unknown long title display: $value'),
   };
+}
+
+enum RewardDuration { short, medium, long }
+
+extension RewardDurationX on RewardDuration {
+  String get wireName => name;
+  Duration get duration => switch (this) {
+    RewardDuration.short => const Duration(milliseconds: 400),
+    RewardDuration.medium => const Duration(milliseconds: 800),
+    RewardDuration.long => const Duration(milliseconds: 1400),
+  };
+
+  static RewardDuration fromWireName(Object? value) => switch (value) {
+    null || 'medium' => RewardDuration.medium,
+    'short' => RewardDuration.short,
+    'long' => RewardDuration.long,
+    _ => throw FormatException('Unknown reward duration: $value'),
+  };
+}
+
+enum DesktopBackgroundFit { cover, contain }
+
+class DesktopAppearance {
+  const DesktopAppearance({
+    this.backgroundImagePath,
+    this.backgroundOverlayOpacity = 1,
+    this.backgroundFit = DesktopBackgroundFit.cover,
+  });
+
+  final String? backgroundImagePath;
+  final double backgroundOverlayOpacity;
+  final DesktopBackgroundFit backgroundFit;
+
+  DesktopAppearance copyWith({
+    String? backgroundImagePath,
+    bool clearBackgroundImage = false,
+    double? backgroundOverlayOpacity,
+    DesktopBackgroundFit? backgroundFit,
+  }) => DesktopAppearance(
+    backgroundImagePath: clearBackgroundImage
+        ? null
+        : (backgroundImagePath ?? this.backgroundImagePath),
+    backgroundOverlayOpacity:
+        backgroundOverlayOpacity ?? this.backgroundOverlayOpacity,
+    backgroundFit: backgroundFit ?? this.backgroundFit,
+  );
+
+  Map<String, Object?> toJson() => {
+    if (backgroundImagePath != null) 'background_image': backgroundImagePath,
+    'background_opacity': backgroundOverlayOpacity,
+    'background_fit': backgroundFit.name,
+  };
+
+  factory DesktopAppearance.fromJson(Map<String, Object?>? json) =>
+      DesktopAppearance(
+        backgroundImagePath: json?['background_image'] as String?,
+        backgroundOverlayOpacity:
+            (json?['background_opacity'] as num?)?.toDouble() ?? 1,
+        backgroundFit: switch (json?['background_fit']) {
+          'contain' => DesktopBackgroundFit.contain,
+          _ => DesktopBackgroundFit.cover,
+        },
+      );
+
+  void validate() {
+    if (!backgroundOverlayOpacity.isFinite ||
+        backgroundOverlayOpacity < 0 ||
+        backgroundOverlayOpacity > 1) {
+      throw const FormatException('background_opacity must be between 0 and 1');
+    }
+  }
+}
+
+class DeviceWorkspaceState {
+  const DeviceWorkspaceState({
+    this.view = WorkspaceView.list,
+    this.currentListId,
+    this.selectedTaskId,
+    this.soundEnabled = true,
+    this.seenTipIds = const {},
+    this.desktopAppearance = const DesktopAppearance(),
+  });
+
+  final WorkspaceView view;
+  final String? currentListId;
+  final String? selectedTaskId;
+  final bool soundEnabled;
+  final Set<String> seenTipIds;
+  final DesktopAppearance desktopAppearance;
+
+  DeviceWorkspaceState copyWith({
+    WorkspaceView? view,
+    String? currentListId,
+    String? selectedTaskId,
+    bool? soundEnabled,
+    Set<String>? seenTipIds,
+    DesktopAppearance? desktopAppearance,
+  }) => DeviceWorkspaceState(
+    view: view ?? this.view,
+    currentListId: currentListId ?? this.currentListId,
+    selectedTaskId: selectedTaskId ?? this.selectedTaskId,
+    soundEnabled: soundEnabled ?? this.soundEnabled,
+    seenTipIds: seenTipIds ?? this.seenTipIds,
+    desktopAppearance: desktopAppearance ?? this.desktopAppearance,
+  );
+
+  Map<String, Object?> toJson() => {
+    'view': view.name,
+    if (currentListId != null) 'current_list_id': currentListId,
+    if (selectedTaskId != null) 'selected_task_id': selectedTaskId,
+    'sound_enabled': soundEnabled,
+    'seen_tips': seenTipIds.toList()..sort(),
+    'desktop_appearance': desktopAppearance.toJson(),
+  };
+
+  factory DeviceWorkspaceState.fromJson(Map<String, Object?> json) {
+    final view = WorkspaceView.values.where(
+      (candidate) => candidate.name == json['view'],
+    );
+    final state = DeviceWorkspaceState(
+      view: view.isEmpty ? WorkspaceView.list : view.first,
+      currentListId: json['current_list_id'] as String?,
+      selectedTaskId: json['selected_task_id'] as String?,
+      soundEnabled: json['sound_enabled'] as bool? ?? true,
+      seenTipIds: Set<String>.from(
+        (json['seen_tips'] as List<Object?>? ?? const []).whereType<String>(),
+      ),
+      desktopAppearance: DesktopAppearance.fromJson(
+        json['desktop_appearance'] == null
+            ? null
+            : Map<String, Object?>.from(json['desktop_appearance']! as Map),
+      ),
+    );
+    state.desktopAppearance.validate();
+    return state;
+  }
 }
 
 class Task {
@@ -348,6 +493,8 @@ class AppSettings {
     this.tagNames = const TagNames(),
     this.languageLocale = 'en',
     this.themeId = 'classic',
+    this.tipsEnabled = true,
+    this.rewardDuration = RewardDuration.medium,
   });
 
   final int marqueeSpeedMs;
@@ -359,6 +506,8 @@ class AppSettings {
   /// The presentation layer matches this against generated localization catalogs.
   final String languageLocale;
   final String themeId;
+  final bool tipsEnabled;
+  final RewardDuration rewardDuration;
 
   AppSettings copyWith({
     int? marqueeSpeedMs,
@@ -367,6 +516,8 @@ class AppSettings {
     TagNames? tagNames,
     String? languageLocale,
     String? themeId,
+    bool? tipsEnabled,
+    RewardDuration? rewardDuration,
   }) => AppSettings(
     marqueeSpeedMs: marqueeSpeedMs ?? this.marqueeSpeedMs,
     longTitleDisplay: longTitleDisplay ?? this.longTitleDisplay,
@@ -374,6 +525,8 @@ class AppSettings {
     tagNames: tagNames ?? this.tagNames,
     languageLocale: languageLocale ?? this.languageLocale,
     themeId: themeId ?? this.themeId,
+    tipsEnabled: tipsEnabled ?? this.tipsEnabled,
+    rewardDuration: rewardDuration ?? this.rewardDuration,
   );
 
   Map<String, Object?> toJson() => {
@@ -383,6 +536,8 @@ class AppSettings {
     'tag_names': tagNames.toJson(),
     'language': languageLocale,
     'theme': themeId,
+    'tips_enabled': tipsEnabled,
+    'reward_duration': rewardDuration.wireName,
   };
 
   factory AppSettings.fromJson(Map<String, Object?> json) => AppSettings(
@@ -398,6 +553,8 @@ class AppSettings {
     ),
     languageLocale: json['language'] as String? ?? 'en',
     themeId: json['theme'] as String? ?? 'classic',
+    tipsEnabled: json['tips_enabled'] as bool? ?? true,
+    rewardDuration: RewardDurationX.fromWireName(json['reward_duration']),
   );
 
   void validate() {

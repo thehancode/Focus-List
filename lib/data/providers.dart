@@ -15,3 +15,7 @@ final taskListRepositoryProvider = Provider<TaskListRepository>(
 final settingsRepositoryProvider = Provider<SettingsRepository>(
   (ref) => LocalSettingsRepository(ref.watch(platformLocalStoreProvider)),
 );
+
+final deviceStateRepositoryProvider = Provider<DeviceStateRepository>(
+  (ref) => LocalDeviceStateRepository(ref.watch(platformLocalStoreProvider)),
+);
