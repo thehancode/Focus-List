@@ -34,11 +34,14 @@ migrate_working_dir/
 /coverage/
 
 # Local development tooling and legacy Rust artifacts
+/.cgcignore
 /.tooling/
 /target/
 /tasklists/
 /PROMPTS.md
 /instructions.txt
+
+mcp.json
 
 # Symbolication related
 app.*.symbols
