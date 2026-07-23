@@ -91,6 +91,9 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    if (ref.read(workspaceViewModelProvider).search != null) {
+      return KeyEventResult.ignored;
+    }
     final vm = ref.read(workspaceViewModelProvider.notifier);
     final control =
         HardwareKeyboard.instance.isControlPressed ||
@@ -838,9 +841,6 @@ class _TaskPanel extends ConsumerWidget {
       WorkspaceView.completed => _CompletedContent(state: state),
       WorkspaceView.multi => _MultiContent(state: state),
     };
-    final content = state.search == null
-        ? normalContent
-        : _SearchContent(state: state);
     final border = switch (state.view) {
       WorkspaceView.list => TerminalPalette.of(context).accent,
       WorkspaceView.focus => TerminalPalette.of(context).doing,
@@ -858,11 +858,11 @@ class _TaskPanel extends ConsumerWidget {
             : BorderRadius.circular(12),
       ),
       child: state.search == null
-          ? content
+          ? normalContent
           : Column(
               children: [
                 const _SearchBar(),
-                Expanded(child: content),
+                Expanded(child: normalContent),
               ],
             ),
     );
@@ -930,9 +930,12 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
       focusNode: _focusNode,
       onKeyEvent: _onKey,
       child: Padding(
+        key: const ValueKey('workspace-search-line'),
         padding: EdgeInsets.symmetric(
           horizontal: TerminalMetrics.cell(context),
-          vertical: 2,
+          vertical: usesTerminalPresentation
+              ? TerminalMetrics.line(context) * .1
+              : 2,
         ),
         child: Row(
           children: [
@@ -945,7 +948,14 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
                 style: _dialogInputStyle(context),
                 decoration: const InputDecoration(
                   isDense: true,
+                  isCollapsed: true,
+                  contentPadding: EdgeInsets.zero,
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
                 ),
                 onChanged: ref
                     .read(workspaceViewModelProvider.notifier)
@@ -1003,56 +1013,42 @@ class _SearchControl extends StatelessWidget {
   );
 }
 
-class _SearchContent extends StatelessWidget {
-  const _SearchContent({required this.state});
-  final WorkspaceState state;
-
-  @override
-  Widget build(BuildContext context) {
-    final tasks = searchTasks(state);
-    if (state.search!.query.isEmpty) {
-      return _EmptyState(AppLocalizations.of(context)!.typeToSearch);
-    }
-    if (tasks.isEmpty) {
-      return _EmptyState(AppLocalizations.of(context)!.noSearchMatches);
-    }
-    return _TaskScrollView(
-      indicatorColor: TerminalPalette.of(context).accent,
-      padding: TerminalMetrics.panelPadding(context),
-      children: [for (final task in tasks) _TaskRow(task: task, state: state)],
-    );
-  }
-}
-
 class _ListContent extends StatelessWidget {
   const _ListContent({required this.state});
   final WorkspaceState state;
 
   @override
-  Widget build(BuildContext context) => _TaskScrollView(
-    key: const ValueKey('task-scroll-list'),
-    indicatorColor: TerminalPalette.of(context).accent,
-    padding: usesTerminalPresentation
-        ? TerminalMetrics.panelPadding(context)
-        : const EdgeInsets.all(12),
-    children: [
-      for (final status in const [
-        TaskStatus.doing,
-        TaskStatus.pending,
-        TaskStatus.done,
-      ])
-        _TaskSection(
-          state: state,
-          title: _statusLabel(status, AppLocalizations.of(context)!),
-          status: status,
-          tasks: visibleTreeTasks(state.currentList)
-              .where(
-                (task) => taskRoot(state.currentList!, task).status == status,
-              )
-              .toList(),
-        ),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final visible = visibleTreeTasks(
+      state.currentList,
+      revealTaskIds: state.search?.matchIds.toSet() ?? const {},
+    );
+    return _TaskScrollView(
+      key: const ValueKey('task-scroll-list'),
+      eager: state.search != null,
+      indicatorColor: TerminalPalette.of(context).accent,
+      padding: usesTerminalPresentation
+          ? TerminalMetrics.panelPadding(context)
+          : const EdgeInsets.all(12),
+      children: [
+        for (final status in const [
+          TaskStatus.doing,
+          TaskStatus.pending,
+          TaskStatus.done,
+        ])
+          _TaskSection(
+            state: state,
+            title: _statusLabel(status, AppLocalizations.of(context)!),
+            status: status,
+            tasks: visible
+                .where(
+                  (task) => taskRoot(state.currentList!, task).status == status,
+                )
+                .toList(),
+          ),
+      ],
+    );
+  }
 }
 
 class _FocusContent extends StatelessWidget {
@@ -1064,9 +1060,11 @@ class _FocusContent extends StatelessWidget {
     final tasks = visibleTreeTasks(
       state.currentList,
       rootStatuses: const {TaskStatus.doing},
+      revealTaskIds: state.search?.matchIds.toSet() ?? const {},
     );
     return _TaskScrollView(
       key: const ValueKey('task-scroll-focus'),
+      eager: state.search != null,
       indicatorColor: TerminalPalette.of(context).doing,
       padding: usesTerminalPresentation
           ? TerminalMetrics.panelPadding(context)
@@ -1086,12 +1084,16 @@ class _CompletedContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rows = completedTreeRows(state.currentList);
+    final rows = completedTreeRows(
+      state.currentList,
+      revealTaskIds: state.search?.matchIds.toSet() ?? const {},
+    );
     if (rows.isEmpty) {
       return _EmptyState(AppLocalizations.of(context)!.noCompletedTasks);
     }
     return _TaskScrollView(
       key: const ValueKey('task-scroll-completed'),
+      eager: state.search != null,
       indicatorColor: TerminalPalette.of(context).done,
       padding: usesTerminalPresentation
           ? TerminalMetrics.panelPadding(context)
@@ -1115,6 +1117,7 @@ class _MultiContent extends StatelessWidget {
       final visible = visibleTreeTasks(
         list,
         rootStatuses: const {TaskStatus.doing, TaskStatus.pending},
+        revealTaskIds: state.search?.matchIds.toSet() ?? const {},
       );
       if (visible.isEmpty) continue;
       children.add(
@@ -1152,6 +1155,7 @@ class _MultiContent extends StatelessWidget {
         ? _EmptyState(AppLocalizations.of(context)!.noDoingOrPendingTasks)
         : _TaskScrollView(
             key: const ValueKey('task-scroll-multi'),
+            eager: state.search != null,
             indicatorColor: TerminalPalette.of(context).accent,
             padding: usesTerminalPresentation
                 ? TerminalMetrics.panelPadding(context)
@@ -1164,11 +1168,13 @@ class _MultiContent extends StatelessWidget {
 class _TaskScrollView extends StatefulWidget {
   const _TaskScrollView({
     super.key,
+    required this.eager,
     required this.indicatorColor,
     required this.padding,
     required this.children,
   });
 
+  final bool eager;
   final Color indicatorColor;
   final EdgeInsetsGeometry padding;
   final List<Widget> children;
@@ -1224,30 +1230,41 @@ class _TaskScrollViewState extends State<_TaskScrollView> {
   }
 
   @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      if (_canScrollUp)
-        _TaskOverflowIndicator(
-          key: const ValueKey('task-overflow-up'),
-          glyph: '▲',
-          color: widget.indicatorColor,
-        ),
-      Expanded(
-        child: ListView(
-          key: const ValueKey('task-list-viewport'),
-          controller: _controller,
-          padding: widget.padding,
-          children: widget.children,
-        ),
-      ),
-      if (_canScrollDown)
-        _TaskOverflowIndicator(
-          key: const ValueKey('task-overflow-down'),
-          glyph: '▼',
-          color: widget.indicatorColor,
-        ),
-    ],
-  );
+  Widget build(BuildContext context) {
+    final viewport = widget.eager
+        ? SingleChildScrollView(
+            key: const ValueKey('task-list-viewport'),
+            controller: _controller,
+            padding: widget.padding,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: widget.children,
+            ),
+          )
+        : ListView(
+            key: const ValueKey('task-list-viewport'),
+            controller: _controller,
+            padding: widget.padding,
+            children: widget.children,
+          );
+    return Column(
+      children: [
+        if (_canScrollUp)
+          _TaskOverflowIndicator(
+            key: const ValueKey('task-overflow-up'),
+            glyph: '▲',
+            color: widget.indicatorColor,
+          ),
+        Expanded(child: viewport),
+        if (_canScrollDown)
+          _TaskOverflowIndicator(
+            key: const ValueKey('task-overflow-down'),
+            glyph: '▼',
+            color: widget.indicatorColor,
+          ),
+      ],
+    );
+  }
 }
 
 class _TaskOverflowIndicator extends StatelessWidget {
@@ -1294,17 +1311,27 @@ class _KeepSelectedTaskVisible extends StatefulWidget {
 
 class _KeepSelectedTaskVisibleState extends State<_KeepSelectedTaskVisible> {
   @override
+  void initState() {
+    super.initState();
+    if (widget.selected) _scheduleReveal();
+  }
+
+  @override
   void didUpdateWidget(covariant _KeepSelectedTaskVisible oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.selected && !oldWidget.selected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _reveal();
-        // Revealing a row can make the opposite overflow indicator appear,
-        // which changes the list viewport by one measured text line. Recheck
-        // after that layout so the newly selected row remains fully visible.
-        WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
-      });
+      _scheduleReveal();
     }
+  }
+
+  void _scheduleReveal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reveal();
+      // Revealing a row can make the opposite overflow indicator appear,
+      // which changes the list viewport by one measured text line. Recheck
+      // after that layout so the newly selected row remains fully visible.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _reveal());
+    });
   }
 
   void _reveal() {
