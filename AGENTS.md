@@ -1,5 +1,23 @@
 # AGENTS.md
 
+## Code exploration
+
+When this repository contains a `.codegraph/` directory, use CodeGraph before
+`rg`, file globbing, or direct file reads to understand or locate code:
+
+- Start with `codegraph_explore` when the MCP tool is available, or run
+  `codegraph explore "<question or symbol names>"` from the repository root.
+- Search graph nodes and call paths first; use the returned source as already
+  read rather than opening the same files again.
+- Before broad or cross-layer edits, check the graph's impact radius with
+  `codegraph impact <symbol>` (or ask `codegraph_explore` for the change's
+  blast radius) to identify affected code and tests.
+- Fall back to `rg`, globbing, or direct reads only when the graph does not
+  answer the question, source is not indexed, or exact non-code content is
+  required.
+- Do not use CodeGraph when `.codegraph/` is absent; indexing remains the
+  user's decision.
+
 ## Project scope
 
 Treat this repository root as the active Flutter product. The former Rust

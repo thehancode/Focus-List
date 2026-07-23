@@ -42,7 +42,7 @@ migrate_working_dir/
 /instructions.txt
 
 mcp.json
-
+.codegraph/
 # Symbolication related
 app.*.symbols
 
