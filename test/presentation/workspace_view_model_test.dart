@@ -324,6 +324,45 @@ void main() {
     },
   );
 
+  test('search matches follow rendered status order', () async {
+    final list = _list('tasks', 'Tasks', [
+      _task('pending', 'Needle pending'),
+      _task('done', 'Needle done', status: TaskStatus.done),
+      _task('doing', 'Needle doing', status: TaskStatus.doing),
+    ]);
+    final container = _container([list]);
+    addTearDown(container.dispose);
+    final vm = await _ready(container);
+
+    vm.openSearch();
+    vm.updateSearch('needle');
+
+    expect(container.read(workspaceViewModelProvider).search!.matchIds, [
+      'doing',
+      'pending',
+      'done',
+    ]);
+  });
+
+  test('tree projection reveals only matching branches while searching', () {
+    final list = _list('tasks', 'Tasks', [
+      _task('root', 'Root').copyWith(collapsed: true),
+      _task('branch', 'Matching branch', parentId: 'root'),
+      _task('match', 'Needle', parentId: 'branch'),
+      _task('unrelated', 'Unrelated', parentId: 'root'),
+    ]);
+
+    expect(visibleTreeTasks(list).map((task) => task.id), ['root']);
+    expect(
+      visibleTreeTasks(
+        list,
+        revealTaskIds: const {'match'},
+      ).map((task) => task.id),
+      ['root', 'branch', 'match'],
+    );
+    expect(list.tasks.first.collapsed, isTrue);
+  });
+
   test('valid per-device view, list, and selection are restored', () async {
     final first = _list('one', 'One', [_task('one-task', 'One')]);
     final second = _list('two', 'Two', [_task('two-task', 'Two')]);

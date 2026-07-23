@@ -577,13 +577,17 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final now = DateTime.utc(2026, 1, 1);
-    Task task(String id, String title) => Task(
+    Task task(
+      String id,
+      String title, {
+      TaskStatus status = TaskStatus.pending,
+    }) => Task(
       id: id,
       title: title,
-      status: TaskStatus.pending,
+      status: status,
       createdAt: now,
       updatedAt: now,
-      completedAt: null,
+      completedAt: status == TaskStatus.done ? now : null,
       daily: false,
       completionHistory: const [],
     );
@@ -612,10 +616,25 @@ void main() {
     await tester.pump();
     final field = find.byKey(const ValueKey('workspace-search-field'));
     expect(field, findsOneWidget);
+    expect(tester.testTextInput.hasAnyClients, isTrue);
+    final searchLine = find.byKey(const ValueKey('workspace-search-line'));
+    final fieldDecoration = tester.widget<TextField>(field).decoration!;
+    expect(fieldDecoration.border, InputBorder.none);
+    expect(fieldDecoration.enabledBorder, InputBorder.none);
+    expect(fieldDecoration.focusedBorder, InputBorder.none);
+    expect(
+      tester.getSize(searchLine).height,
+      lessThanOrEqualTo(TerminalMetrics.line(tester.element(searchLine))),
+    );
+    expect(find.textContaining('Pending (2)'), findsOneWidget);
+    expect(find.text('Needle alpha'), findsOneWidget);
+    expect(find.text('Needle beta'), findsOneWidget);
     await tester.enterText(field, 'needle');
     await tester.pump();
     expect(find.text('1/2 '), findsOneWidget);
 
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
     await tester.pump();
     expect(find.text('2/2 '), findsOneWidget);
@@ -632,6 +651,419 @@ void main() {
       ),
       findsOneWidget,
     );
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('search scrolls a distant wrapped match fully into view', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(420, 300));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final now = DateTime.utc(2026, 1, 1);
+    Task task(int index, String title) => Task(
+      id: 'task-$index',
+      title: title,
+      status: TaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+    );
+    const lastTitle =
+        'Needle last has enough words to wrap across multiple terminal lines';
+    final list = TaskList(
+      schemaVersion: currentSchemaVersion,
+      id: 'search-list',
+      name: 'Search',
+      createdAt: now,
+      tasks: [
+        task(0, 'Needle first'),
+        for (var index = 1; index < 15; index++)
+          task(index, 'Ordinary task $index'),
+        task(15, lastTitle),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('workspace-search-field')),
+      'needle',
+    );
+    await tester.pump();
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+    await tester.pump();
+    await tester.pump();
+
+    final viewport = find.byKey(const ValueKey('task-list-viewport'));
+    final selectedTask = find.descendant(
+      of: viewport,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.properties.button == true &&
+            widget.properties.selected == true,
+      ),
+    );
+    expect(selectedTask, findsOneWidget);
+    expect(
+      tester.getTopLeft(selectedTask).dy,
+      greaterThanOrEqualTo(tester.getTopLeft(viewport).dy),
+    );
+    expect(
+      tester.getBottomLeft(selectedTask).dy,
+      lessThanOrEqualTo(tester.getBottomLeft(viewport).dy + .1),
+    );
+    expect(find.text(lastTitle, findRichText: true), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets(
+    'multi-search scrolls a selected match in another list into view',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      await tester.binding.setSurfaceSize(const Size(420, 300));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final now = DateTime.utc(2026, 1, 1);
+      Task task(
+        String id,
+        String title, {
+        TaskStatus status = TaskStatus.pending,
+      }) => Task(
+        id: id,
+        title: title,
+        status: status,
+        createdAt: now,
+        updatedAt: now,
+        completedAt: status == TaskStatus.done ? now : null,
+        daily: false,
+        completionHistory: const [],
+      );
+      TaskList list(String id, String name, List<Task> tasks) => TaskList(
+        schemaVersion: currentSchemaVersion,
+        id: id,
+        name: name,
+        createdAt: now,
+        tasks: tasks,
+      );
+      const lastTitle =
+          'Needle in the second list has enough words to wrap across lines';
+      final lists = [
+        list('first', 'First', [
+          task('first-match', 'Needle in the first list'),
+          for (var index = 0; index < 12; index++)
+            task('first-$index', 'First task $index'),
+        ]),
+        list('second', 'Second', [
+          for (var index = 0; index < 12; index++)
+            task('second-$index', 'Second task $index'),
+          task('second-match', lastTitle, status: TaskStatus.done),
+        ]),
+      ];
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            deviceStateRepositoryProvider.overrideWithValue(
+              const _DeviceState(),
+            ),
+            taskListRepositoryProvider.overrideWithValue(_Lists(lists)),
+            settingsRepositoryProvider.overrideWithValue(const _Settings()),
+          ],
+          child: const FocusListApp(),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 20));
+
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('workspace-search-field')),
+        'needle',
+      );
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.arrowDown);
+      await tester.pump();
+      await tester.pump();
+
+      final viewport = find.byKey(const ValueKey('task-list-viewport'));
+      final selectedTask = find.descendant(
+        of: viewport,
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              widget.properties.button == true &&
+              widget.properties.selected == true,
+        ),
+      );
+      expect(selectedTask, findsOneWidget);
+      expect(
+        tester.getTopLeft(selectedTask).dy,
+        greaterThanOrEqualTo(tester.getTopLeft(viewport).dy),
+      );
+      expect(
+        tester.getBottomLeft(selectedTask).dy,
+        lessThanOrEqualTo(tester.getBottomLeft(viewport).dy + .1),
+      );
+      expect(find.text(lastTitle, findRichText: true), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      debugDefaultTargetPlatformOverride = null;
+    },
+  );
+
+  testWidgets('workspace shortcuts stay inactive while typing a search', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    var popCalls = 0;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'SystemNavigator.pop') popCalls++;
+        return null;
+      },
+    );
+    addTearDown(
+      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      ),
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([_listWithTask()]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    for (final key in [
+      LogicalKeyboardKey.keyQ,
+      LogicalKeyboardKey.keyA,
+      LogicalKeyboardKey.keyN,
+      LogicalKeyboardKey.keyE,
+    ]) {
+      await tester.sendKeyEvent(key);
+      await tester.pump();
+    }
+
+    final field = find.byKey(const ValueKey('workspace-search-field'));
+    expect(field, findsOneWidget);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(popCalls, 0);
+    await tester.enterText(field, 'qane');
+    await tester.pump();
+    expect(find.text('qane'), findsOneWidget);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('search temporarily reveals only a matching collapsed branch', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final now = DateTime.utc(2026, 1, 1);
+    Task task(String id, String title, {String? parentId}) => Task(
+      id: id,
+      title: title,
+      status: TaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+      parentId: parentId,
+    );
+    final list = TaskList(
+      schemaVersion: currentSchemaVersion,
+      id: 'search-list',
+      name: 'Search',
+      createdAt: now,
+      tasks: [
+        task('root', 'Root').copyWith(collapsed: true),
+        task('branch', 'Matching branch', parentId: 'root'),
+        task('match', 'Hidden Needle', parentId: 'branch'),
+        task('unrelated', 'Unrelated', parentId: 'root'),
+      ],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    expect(find.text('Root'), findsOneWidget);
+    expect(find.text('Matching branch'), findsNothing);
+    expect(find.text('Hidden Needle'), findsNothing);
+    expect(find.text('Unrelated'), findsNothing);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+    await tester.enterText(
+      find.byKey(const ValueKey('workspace-search-field')),
+      'needle',
+    );
+    await tester.pump();
+
+    expect(find.text('Root'), findsOneWidget);
+    expect(find.text('Matching branch'), findsOneWidget);
+    expect(find.text('Hidden Needle', findRichText: true), findsOneWidget);
+    expect(find.text('Unrelated'), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pump();
+    expect(find.text('Matching branch'), findsNothing);
+    expect(find.text('Hidden Needle'), findsNothing);
+    expect(find.text('Unrelated'), findsNothing);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('inline search fits terminal mode at maximum font size', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(700, 500));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([_listWithTask()]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(
+            const _Settings(AppSettings(nativeFontSize: 28)),
+          ),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('workspace-search-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Swipe me'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('inline search fits a constrained terminal window', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(420, 300));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([_listWithTask()]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('workspace-search-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Swipe me'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('Android hardware search keeps the task list visible', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(
+            _Lists([_listWithTask()]),
+          ),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyF);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey('workspace-search-field')),
+      findsOneWidget,
+    );
+    expect(find.text('Swipe me'), findsOneWidget);
+    expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
 

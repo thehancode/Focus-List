@@ -220,41 +220,63 @@ class CompletionTreeRow {
   final DateTime? completedAt;
 }
 
-List<CompletionTreeRow> completedTreeRows(TaskList? list) {
+List<CompletionTreeRow> completedTreeRows(
+  TaskList? list, {
+  Set<String> revealTaskIds = const {},
+}) {
   if (list == null) return const [];
+  final revealPathIds = _taskRevealPathIds(list, revealTaskIds);
   final rows = <CompletionTreeRow>[];
   for (final entry in completionEntries(list)) {
-    final hiddenParents = <String>{};
+    final suppressedParents = <String>{};
     for (final task in [entry.task, ...taskDescendants(list, entry.task)]) {
-      if (task.parentId != null && hiddenParents.contains(task.parentId)) {
-        hiddenParents.add(task.id);
-        continue;
+      final suppressed =
+          task.parentId != null && suppressedParents.contains(task.parentId);
+      if (!suppressed || revealPathIds.contains(task.id)) {
+        rows.add(
+          CompletionTreeRow(
+            task,
+            task.id == entry.task.id ? entry.completedAt : null,
+          ),
+        );
       }
-      rows.add(
-        CompletionTreeRow(
-          task,
-          task.id == entry.task.id ? entry.completedAt : null,
-        ),
-      );
-      if (task.collapsed) hiddenParents.add(task.id);
+      if (suppressed || task.collapsed) suppressedParents.add(task.id);
     }
   }
   return rows;
 }
 
-List<Task> visibleTreeTasks(TaskList? list, {Set<TaskStatus>? rootStatuses}) {
+List<Task> visibleTreeTasks(
+  TaskList? list, {
+  Set<TaskStatus>? rootStatuses,
+  Set<String> revealTaskIds = const {},
+}) {
   if (list == null) return const [];
+  final revealPathIds = _taskRevealPathIds(list, revealTaskIds);
   final result = <Task>[];
-  final hiddenParents = <String>{};
+  final suppressedParents = <String>{};
   for (final task in list.tasks) {
     final root = taskRoot(list, task);
     if (rootStatuses != null && !rootStatuses.contains(root.status)) continue;
-    if (task.parentId != null && hiddenParents.contains(task.parentId)) {
-      hiddenParents.add(task.id);
-      continue;
+    final suppressed =
+        task.parentId != null && suppressedParents.contains(task.parentId);
+    if (!suppressed || revealPathIds.contains(task.id)) {
+      result.add(task);
     }
-    result.add(task);
-    if (task.collapsed) hiddenParents.add(task.id);
+    if (suppressed || task.collapsed) suppressedParents.add(task.id);
+  }
+  return result;
+}
+
+Set<String> _taskRevealPathIds(TaskList list, Set<String> revealTaskIds) {
+  if (revealTaskIds.isEmpty) return const {};
+  final byId = {for (final task in list.tasks) task.id: task};
+  final result = <String>{};
+  for (final id in revealTaskIds) {
+    var task = byId[id];
+    while (task != null && result.add(task.id)) {
+      task = task.parentId == null ? null : byId[task.parentId];
+    }
   }
   return result;
 }
@@ -1217,17 +1239,11 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     final search = state.search;
     if (search == null) return;
     final needle = query.toLowerCase();
-    final lists = search.allLists
-        ? state.lists
-        : state.currentList == null
-        ? const <TaskList>[]
-        : [state.currentList!];
     final matches = needle.isEmpty
         ? const <String>[]
         : [
-            for (final list in lists)
-              for (final task in list.tasks)
-                if (task.title.toLowerCase().contains(needle)) task.id,
+            for (final task in _searchTasksInDisplayOrder(search))
+              if (task.title.toLowerCase().contains(needle)) task.id,
           ];
     final next = search.copyWith(
       query: query,
@@ -1237,6 +1253,50 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     state = state.copyWith(search: next);
     final id = next.currentTaskId;
     if (id != null) selectTask(id);
+  }
+
+  List<Task> _searchTasksInDisplayOrder(WorkspaceSearchState search) {
+    final result = <Task>[];
+    final seen = <String>{};
+
+    void addTask(Task task) {
+      if (seen.add(task.id)) result.add(task);
+    }
+
+    void addStatuses(TaskList list, Iterable<TaskStatus> statuses) {
+      for (final status in statuses) {
+        for (final task in list.tasks) {
+          if (taskRoot(list, task).status == status) addTask(task);
+        }
+      }
+    }
+
+    if (search.allLists) {
+      for (final list in state.lists) {
+        addStatuses(list, const [TaskStatus.doing, TaskStatus.pending]);
+      }
+      for (final list in state.lists) {
+        addStatuses(list, const [TaskStatus.done]);
+      }
+      return result;
+    }
+
+    final list = state.currentList;
+    if (list == null) return result;
+    if (state.view == WorkspaceView.completed) {
+      for (final entry in completionEntries(list)) {
+        addTask(entry.task);
+        for (final task in taskDescendants(list, entry.task)) {
+          addTask(task);
+        }
+      }
+    }
+    addStatuses(list, const [
+      TaskStatus.doing,
+      TaskStatus.pending,
+      TaskStatus.done,
+    ]);
+    return result;
   }
 
   void moveSearch(int delta) {

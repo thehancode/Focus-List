@@ -91,10 +91,18 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
     if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
       return KeyEventResult.ignored;
     }
+    final vm = ref.read(workspaceViewModelProvider.notifier);
     if (ref.read(workspaceViewModelProvider).search != null) {
+      if (event.logicalKey == LogicalKeyboardKey.arrowUp) {
+        vm.moveSearch(-1);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.arrowDown) {
+        vm.moveSearch(1);
+        return KeyEventResult.handled;
+      }
       return KeyEventResult.ignored;
     }
-    final vm = ref.read(workspaceViewModelProvider.notifier);
     final control =
         HardwareKeyboard.instance.isControlPressed ||
         HardwareKeyboard.instance.isMetaPressed;
@@ -878,21 +886,46 @@ class _SearchBar extends ConsumerStatefulWidget {
 
 class _SearchBarState extends ConsumerState<_SearchBar> {
   final _controller = TextEditingController();
-  final _focusNode = FocusNode(debugLabel: 'workspace-search');
+  late final _navigationFocusNode = FocusNode(
+    debugLabel: 'workspace-search-navigation',
+    onKeyEvent: _onKey,
+  );
+  late final _fieldFocusNode = FocusNode(
+    debugLabel: 'workspace-search',
+    onKeyEvent: _onKey,
+  );
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => _focusNode.requestFocus(),
-    );
+    _fieldFocusNode.addListener(_restoreNavigationFocus);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fieldFocusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
+    _fieldFocusNode.removeListener(_restoreNavigationFocus);
     _controller.dispose();
-    _focusNode.dispose();
+    _navigationFocusNode.dispose();
+    _fieldFocusNode.dispose();
     super.dispose();
+  }
+
+  void _restoreNavigationFocus() {
+    if (_fieldFocusNode.hasFocus ||
+        !mounted ||
+        ref.read(workspaceViewModelProvider).search == null) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted &&
+          !_fieldFocusNode.hasFocus &&
+          ref.read(workspaceViewModelProvider).search != null) {
+        _navigationFocusNode.requestFocus();
+      }
+    });
   }
 
   void _close() {
@@ -927,7 +960,7 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
     final search = ref.watch(workspaceViewModelProvider).search!;
     final current = search.matchIds.isEmpty ? 0 : search.currentIndex + 1;
     return Focus(
-      focusNode: _focusNode,
+      focusNode: _navigationFocusNode,
       onKeyEvent: _onKey,
       child: Padding(
         key: const ValueKey('workspace-search-line'),
@@ -944,6 +977,7 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
               child: TextField(
                 key: const ValueKey('workspace-search-field'),
                 controller: _controller,
+                focusNode: _fieldFocusNode,
                 autofocus: true,
                 style: _dialogInputStyle(context),
                 decoration: const InputDecoration(
@@ -961,6 +995,7 @@ class _SearchBarState extends ConsumerState<_SearchBar> {
                     .read(workspaceViewModelProvider.notifier)
                     .updateSearch,
                 onSubmitted: (_) => _close(),
+                onTapOutside: (_) => _navigationFocusNode.requestFocus(),
               ),
             ),
             Text('$current/${search.matchIds.length} '),
@@ -1114,12 +1149,31 @@ class _MultiContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final children = <Widget>[];
     for (final list in state.lists) {
+      final searchMatchIds = state.search?.matchIds.toSet() ?? const <String>{};
       final visible = visibleTreeTasks(
         list,
         rootStatuses: const {TaskStatus.doing, TaskStatus.pending},
-        revealTaskIds: state.search?.matchIds.toSet() ?? const {},
+        revealTaskIds: searchMatchIds,
       );
-      if (visible.isEmpty) continue;
+      final matchingDoneRootIds = <String>{
+        for (final task in list.tasks)
+          if (searchMatchIds.contains(task.id) &&
+              taskRoot(list, task).status == TaskStatus.done)
+            taskRoot(list, task).id,
+      };
+      final matchingDoneTasks = matchingDoneRootIds.isEmpty
+          ? const <Task>[]
+          : visibleTreeTasks(
+                  list,
+                  rootStatuses: const {TaskStatus.done},
+                  revealTaskIds: searchMatchIds,
+                )
+                .where(
+                  (task) =>
+                      matchingDoneRootIds.contains(taskRoot(list, task).id),
+                )
+                .toList();
+      if (visible.isEmpty && matchingDoneTasks.isEmpty) continue;
       children.add(
         Padding(
           padding: EdgeInsets.only(
@@ -1149,6 +1203,16 @@ class _MultiContent extends StatelessWidget {
             ),
           );
         }
+      }
+      if (matchingDoneTasks.isNotEmpty) {
+        children.add(
+          _TaskSection(
+            state: state,
+            title: _statusLabel(TaskStatus.done, AppLocalizations.of(context)!),
+            status: TaskStatus.done,
+            tasks: matchingDoneTasks,
+          ),
+        );
       }
     }
     return children.isEmpty

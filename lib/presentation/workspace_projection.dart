@@ -42,16 +42,3 @@ String sectionAsIndentedText(ProjectedTaskSection section) {
       })
       .join('\n');
 }
-
-List<Task> searchTasks(WorkspaceState state) {
-  final search = state.search;
-  if (search == null) return const [];
-  final byId = {
-    for (final list in state.lists)
-      for (final task in list.tasks) task.id: task,
-  };
-  return [
-    for (final id in search.matchIds)
-      if (byId[id] != null) byId[id]!,
-  ];
-}
