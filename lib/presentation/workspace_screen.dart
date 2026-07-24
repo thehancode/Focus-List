@@ -843,6 +843,13 @@ class _TaskPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final appearance = state.deviceState.desktopAppearance;
+    final panelOpacity =
+        !kIsWeb &&
+            defaultTargetPlatform == TargetPlatform.linux &&
+            appearance.backgroundImagePath != null
+        ? 0.0
+        : 1.0;
     final normalContent = switch (state.view) {
       WorkspaceView.list => _ListContent(state: state),
       WorkspaceView.focus => _FocusContent(state: state),
@@ -859,7 +866,9 @@ class _TaskPanel extends ConsumerWidget {
       key: ValueKey('task-panel-${state.view.name}'),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: TerminalPalette.of(context).panel,
+        color: TerminalPalette.of(
+          context,
+        ).panel.withValues(alpha: panelOpacity),
         border: Border.all(color: border),
         borderRadius: usesTerminalPresentation
             ? BorderRadius.circular(TerminalMetrics.panelRadius)
@@ -1820,10 +1829,11 @@ class _TaskTitle extends StatefulWidget {
 class _TaskTitleState extends State<_TaskTitle> {
   static const _marqueeSeparator = '  ▢  ';
   static const _marqueeFrameInterval = Duration(milliseconds: 16);
+  static const _marqueeStartDelay = Duration(milliseconds: 900);
 
   Timer? _timer;
+  Timer? _marqueeStartTimer;
   final _marqueeScrollController = ScrollController();
-  var _offset = 0;
   var _marqueeOffset = 0.0;
   var _available = 0;
 
@@ -1839,7 +1849,6 @@ class _TaskTitleState extends State<_TaskTitle> {
     if (oldWidget.selected != widget.selected ||
         oldWidget.display != widget.display ||
         oldWidget.speed != widget.speed) {
-      _offset = 0;
       _marqueeOffset = 0;
       _configureTimer(resetMarquee: true);
     }
@@ -1847,6 +1856,7 @@ class _TaskTitleState extends State<_TaskTitle> {
 
   void _configureTimer({bool resetMarquee = false}) {
     _timer?.cancel();
+    _marqueeStartTimer?.cancel();
     if (!widget.selected || _available == 0) return;
     if (widget.display == LongTitleDisplay.marquee) {
       final length = widget.value
@@ -1857,37 +1867,35 @@ class _TaskTitleState extends State<_TaskTitle> {
           (length + _marqueeSeparator.characters.length) *
           TerminalMetrics.cell(context);
       if (resetMarquee) _marqueeOffset = 0;
-      _timer = Timer.periodic(_marqueeFrameInterval, (_) {
-        if (!mounted) return;
-        setState(() {
-          _marqueeOffset =
-              (_marqueeOffset +
-                  _marqueeFrameInterval.inMilliseconds *
-                      TerminalMetrics.cell(context) /
-                      widget.speed) %
-              cycleWidth;
-        });
-        if (_marqueeScrollController.hasClients) {
-          _marqueeScrollController.jumpTo(_marqueeOffset);
+      _marqueeStartTimer = Timer(_marqueeStartDelay, () {
+        if (!mounted ||
+            !widget.selected ||
+            widget.display != LongTitleDisplay.marquee) {
+          return;
         }
+        _timer = Timer.periodic(_marqueeFrameInterval, (_) {
+          if (!mounted) return;
+          setState(() {
+            _marqueeOffset =
+                (_marqueeOffset +
+                    _marqueeFrameInterval.inMilliseconds *
+                        TerminalMetrics.cell(context) /
+                        widget.speed) %
+                cycleWidth;
+          });
+          if (_marqueeScrollController.hasClients) {
+            _marqueeScrollController.jumpTo(_marqueeOffset);
+          }
+        });
       });
       return;
     }
-    if (widget.display != LongTitleDisplay.slidingWindow) return;
-    final stride = (_available - 5).clamp(1, _available);
-    _timer = Timer.periodic(Duration(milliseconds: widget.speed * stride), (_) {
-      if (!mounted) return;
-      final length = widget.value.characters.length;
-      final last = (length - _available).clamp(0, length);
-      setState(() {
-        _offset = _offset >= last ? 0 : (_offset + stride).clamp(0, last);
-      });
-    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _marqueeStartTimer?.cancel();
     _marqueeScrollController.dispose();
     super.dispose();
   }
@@ -1941,9 +1949,8 @@ class _TaskTitleState extends State<_TaskTitle> {
             ),
           );
         }
-        final text = characters.skip(_offset).take(available).join();
         return Text(
-          text,
+          source,
           maxLines: 1,
           overflow: TextOverflow.clip,
           style: widget.style,
@@ -2999,7 +3006,6 @@ String _longTitleLabel(AppLocalizations strings, LongTitleDisplay display) =>
     switch (display) {
       LongTitleDisplay.wrapSelected => strings.wrapSelected,
       LongTitleDisplay.wrapAll => strings.wrapAll,
-      LongTitleDisplay.slidingWindow => strings.slidingWindow,
       LongTitleDisplay.marquee => strings.marquee,
     };
 

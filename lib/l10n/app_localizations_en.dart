@@ -333,9 +333,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get wrapAll => 'Wrap all';
 
   @override
-  String get slidingWindow => 'Sliding window';
-
-  @override
   String get marquee => 'Marquee';
 
   @override

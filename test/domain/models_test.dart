@@ -145,7 +145,7 @@ void main() {
       'tips_enabled': false,
       'reward_duration': 'long',
     });
-    expect(settings.longTitleDisplay, LongTitleDisplay.slidingWindow);
+    expect(settings.longTitleDisplay, LongTitleDisplay.marquee);
     expect(settings.tipsEnabled, isFalse);
     expect(
       settings.rewardDuration.duration,

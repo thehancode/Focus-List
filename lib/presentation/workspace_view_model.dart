@@ -1017,12 +1017,31 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       animationTaskId: selected.id,
     );
     if (success) {
+      if (nextView == WorkspaceView.list) {
+        final nextPendingId = _nextPendingTaskId(selected.id);
+        if (nextPendingId != null) selectTask(nextPendingId);
+      }
       if (!state.visibleTaskIds.contains(state.selectedTaskId)) {
         state = _withFirstVisibleSelected(state.copyWith(clearSelection: true));
       }
       _maybeShowReward(selected.id);
     }
     return success;
+  }
+
+  String? _nextPendingTaskId(String completedTaskId) {
+    final ids = state.visibleTaskIds;
+    if (ids.isEmpty) return null;
+    final selectedIndex = ids.indexOf(completedTaskId);
+    final start = selectedIndex < 0 ? 0 : selectedIndex + 1;
+    for (var offset = 0; offset < ids.length; offset++) {
+      final id = ids[(start + offset) % ids.length];
+      final task = state.lists
+          .expand((list) => list.tasks)
+          .firstWhere((task) => task.id == id);
+      if (task.status == TaskStatus.pending) return id;
+    }
+    return null;
   }
 
   Future<bool> revertSelectedCompletedTask() async {

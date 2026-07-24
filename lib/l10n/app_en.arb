@@ -200,8 +200,6 @@
   "@wrapSelected": {"description": "Long-title mode that wraps only the selected task."},
   "wrapAll": "Wrap all",
   "@wrapAll": {"description": "Long-title mode that wraps all tasks."},
-  "slidingWindow": "Sliding window",
-  "@slidingWindow": {"description": "Long-title mode that advances overlapping text windows."},
   "marquee": "Marquee",
   "@marquee": {"description": "Long-title mode that scrolls one character at a time."},
   "shortDuration": "Short",

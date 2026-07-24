@@ -53,14 +53,13 @@ extension TaskStatusX on TaskStatus {
 
 enum WorkspaceView { list, focus, completed, multi }
 
-enum LongTitleDisplay { wrapSelected, wrapAll, slidingWindow, marquee }
+enum LongTitleDisplay { wrapSelected, wrapAll, marquee }
 
 extension LongTitleDisplayX on LongTitleDisplay {
   String get wireName => name;
   String get label => switch (this) {
     LongTitleDisplay.wrapSelected => 'Wrap selected',
     LongTitleDisplay.wrapAll => 'Wrap all',
-    LongTitleDisplay.slidingWindow => 'Sliding window',
     LongTitleDisplay.marquee => 'Marquee',
   };
 
@@ -71,7 +70,7 @@ extension LongTitleDisplayX on LongTitleDisplay {
     null || 'marquee' => LongTitleDisplay.marquee,
     'wrap' || 'wrapAll' => LongTitleDisplay.wrapAll,
     'wrapSelected' => LongTitleDisplay.wrapSelected,
-    'slidingWindow' => LongTitleDisplay.slidingWindow,
+    'slidingWindow' => LongTitleDisplay.marquee,
     _ => throw FormatException('Unknown long title display: $value'),
   };
 }

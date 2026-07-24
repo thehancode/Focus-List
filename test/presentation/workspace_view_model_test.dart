@@ -297,6 +297,20 @@ void main() {
     expect(container.read(workspaceViewModelProvider).selectedTaskId, 'root');
   });
 
+  test('list completion selects the next pending task', () async {
+    final list = _list('tasks', 'Tasks', [
+      _task('first', 'First'),
+      _task('second', 'Second'),
+    ]);
+    final container = _container([list]);
+    addTearDown(container.dispose);
+    final vm = await _ready(container);
+
+    expect(container.read(workspaceViewModelProvider).selectedTaskId, 'first');
+    expect(await vm.completeSelectedTask(), isTrue);
+    expect(container.read(workspaceViewModelProvider).selectedTaskId, 'second');
+  });
+
   test(
     'search includes collapsed descendants and retains selected match',
     () async {

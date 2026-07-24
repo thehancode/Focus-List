@@ -335,9 +335,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get wrapAll => 'Ajustar todos';
 
   @override
-  String get slidingWindow => 'Ventana deslizante';
-
-  @override
   String get marquee => 'Marquesina';
 
   @override
@@ -708,9 +705,6 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
   String get wrapAll => 'Ajustar todos';
 
   @override
-  String get slidingWindow => 'Ventana deslizante';
-
-  @override
   String get marquee => 'Marquesina';
 
   @override
@@ -1079,9 +1073,6 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
 
   @override
   String get wrapAll => 'Ajustar todos';
-
-  @override
-  String get slidingWindow => 'Ventana deslizante';
 
   @override
   String get marquee => 'Marquesina';

@@ -166,6 +166,45 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('terminal task-panel background is transparent over an image', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(
+            const _DeviceState(
+              DeviceWorkspaceState(
+                desktopAppearance: DesktopAppearance(
+                  backgroundImagePath: '/background.png',
+                ),
+              ),
+            ),
+          ),
+          taskListRepositoryProvider.overrideWithValue(_Lists()),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final panel = tester.widget<Container>(
+      find.byKey(const ValueKey('task-panel-list')),
+    );
+    final decoration = panel.decoration! as BoxDecoration;
+    expect(
+      decoration.color,
+      TerminalPalette.of(
+        tester.element(find.byKey(const ValueKey('task-panel-list'))),
+      ).panel.withValues(alpha: 0),
+    );
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   for (final scenario in [
     (name: 'list', status: TaskStatus.pending),
     (name: 'focus', status: TaskStatus.doing),
@@ -468,7 +507,9 @@ void main() {
     expect(marquee, findsOneWidget);
     final scrollView = tester.widget<SingleChildScrollView>(marquee);
     final initialOffset = scrollView.controller!.offset;
-    await tester.pump(const Duration(milliseconds: minMarqueeSpeedMs));
+    await tester.pump(const Duration(milliseconds: 750));
+    expect(scrollView.controller!.offset, initialOffset);
+    await tester.pump(const Duration(milliseconds: 300));
     final movedOffset = scrollView.controller!.offset;
     expect(movedOffset, greaterThan(initialOffset));
     expect(tester.takeException(), isNull);
@@ -1347,10 +1388,12 @@ class _Settings implements SettingsRepository {
 }
 
 class _DeviceState implements DeviceStateRepository {
-  const _DeviceState();
+  const _DeviceState([this.state = const DeviceWorkspaceState()]);
+
+  final DeviceWorkspaceState state;
 
   @override
-  Future<DeviceWorkspaceState> load() async => const DeviceWorkspaceState();
+  Future<DeviceWorkspaceState> load() async => state;
 
   @override
   Future<void> save(DeviceWorkspaceState state) async {}

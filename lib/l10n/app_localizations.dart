@@ -700,12 +700,6 @@ abstract class AppLocalizations {
   /// **'Wrap all'**
   String get wrapAll;
 
-  /// Long-title mode that advances overlapping text windows.
-  ///
-  /// In en, this message translates to:
-  /// **'Sliding window'**
-  String get slidingWindow;
-
   /// Long-title mode that scrolls one character at a time.
   ///
   /// In en, this message translates to:
