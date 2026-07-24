@@ -1534,152 +1534,159 @@ class _TaskRow extends ConsumerWidget {
                 task.tags.map(state.settings.tagNames.nameFor).join(', '),
               ),
       ),
-      child: InkWell(
-        onTap: () =>
+      child: Listener(
+        onPointerDown: (_) =>
             ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
-        onDoubleTap: () async {
-          ref.read(workspaceViewModelProvider.notifier).selectTask(task.id);
-          await Clipboard.setData(ClipboardData(text: task.title));
-        },
-        borderRadius: terminal ? BorderRadius.zero : BorderRadius.circular(5),
-        child: AnimatedContainer(
-          constraints: const BoxConstraints(),
-          duration: terminal
-              ? Duration.zero
-              : const Duration(milliseconds: 220),
-          margin: EdgeInsets.symmetric(vertical: terminal ? 0 : 2),
-          padding: EdgeInsets.symmetric(
-            horizontal: terminal ? 0 : 8,
-            vertical: terminal ? 1 : 9,
-          ).add(EdgeInsets.only(left: terminal ? 0 : depth * 16.0)),
-          decoration: BoxDecoration(
-            color: highlighted
-                ? TerminalPalette.of(context).accent
-                : animated
-                ? _statusColor(context, task.status)
-                : selected
-                ? TerminalPalette.of(context).accent
-                : Colors.transparent,
-            borderRadius: terminal
-                ? BorderRadius.zero
-                : BorderRadius.circular(5),
-            border: null,
-          ),
-          // The selected row supplies the violet background across its full
-          // measured height, including the tag columns.
-          child: Row(
-            children: [
-              Text(
-                '${terminal ? '  ' * depth : ''}${hasChildren ? (task.collapsed ? '▸ ' : '▾ ') : (selected ? '› ' : '- ')}',
-                style: TextStyle(
-                  color: selected
-                      ? TerminalPalette.of(context).background
-                      : TerminalPalette.of(context).muted,
-                  fontWeight: FontWeight.bold,
+        child: InkWell(
+          onTap: () =>
+              ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
+          onDoubleTap: () async {
+            ref.read(workspaceViewModelProvider.notifier).selectTask(task.id);
+            await Clipboard.setData(ClipboardData(text: task.title));
+          },
+          borderRadius: terminal ? BorderRadius.zero : BorderRadius.circular(5),
+          child: AnimatedContainer(
+            constraints: const BoxConstraints(),
+            duration: terminal
+                ? Duration.zero
+                : const Duration(milliseconds: 220),
+            margin: EdgeInsets.symmetric(vertical: terminal ? 0 : 2),
+            padding: EdgeInsets.symmetric(
+              horizontal: terminal ? 0 : 8,
+              vertical: terminal ? 1 : 9,
+            ).add(EdgeInsets.only(left: terminal ? 0 : depth * 16.0)),
+            decoration: BoxDecoration(
+              color: highlighted
+                  ? TerminalPalette.of(context).accent
+                  : animated
+                  ? _statusColor(context, task.status)
+                  : selected
+                  ? TerminalPalette.of(context).accent
+                  : Colors.transparent,
+              borderRadius: terminal
+                  ? BorderRadius.zero
+                  : BorderRadius.circular(5),
+              border: null,
+            ),
+            // The selected row supplies the violet background across its full
+            // measured height, including the tag columns.
+            child: Row(
+              children: [
+                Text(
+                  '${terminal ? '  ' * depth : ''}${hasChildren ? (task.collapsed ? '▸ ' : '▾ ') : (selected ? '› ' : '- ')}',
+                  style: TextStyle(
+                    color: selected
+                        ? TerminalPalette.of(context).background
+                        : TerminalPalette.of(context).muted,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-              ),
-              Expanded(child: title),
-              _TaskTags(task: task, selected: selected),
-              if (task.daily)
-                terminal
-                    ? Text(
-                        ' ↻',
-                        style: TextStyle(
+                Expanded(child: title),
+                _TaskTags(task: task, selected: selected),
+                if (task.daily)
+                  terminal
+                      ? Text(
+                          ' ↻',
+                          style: TextStyle(
+                            color: selected
+                                ? TerminalPalette.of(context).background
+                                : TerminalPalette.of(context).done,
+                          ),
+                        )
+                      : Icon(
+                          Icons.repeat,
+                          size: 16,
                           color: selected
                               ? TerminalPalette.of(context).background
                               : TerminalPalette.of(context).done,
                         ),
-                      )
-                    : Icon(
-                        Icons.repeat,
-                        size: 16,
+                if (completedAt != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 8),
+                    child: Text(
+                      _localStamp(completedAt!),
+                      style: TextStyle(
                         color: selected
                             ? TerminalPalette.of(context).background
-                            : TerminalPalette.of(context).done,
+                            : TerminalPalette.of(context).muted,
+                        fontSize: terminal ? null : 12,
                       ),
-              if (completedAt != null)
-                Padding(
-                  padding: const EdgeInsets.only(left: 8),
-                  child: Text(
-                    _localStamp(completedAt!),
-                    style: TextStyle(
+                    ),
+                  ),
+                if (completedAt == null &&
+                    !terminal &&
+                    !(task.parentId != null && task.status == TaskStatus.done))
+                  IconButton(
+                    tooltip: AppLocalizations.of(context)!.advanceTask,
+                    color: selected
+                        ? TerminalPalette.of(context).background
+                        : _statusColor(context, task.status),
+                    onPressed: () {
+                      ref
+                          .read(workspaceViewModelProvider.notifier)
+                          .selectTask(task.id);
+                      unawaited(
+                        ref
+                            .read(workspaceViewModelProvider.notifier)
+                            .advanceSelectedTask(),
+                      );
+                    },
+                    icon: const Icon(Icons.play_arrow),
+                  ),
+                if (!terminal)
+                  PopupMenuButton<String>(
+                    tooltip: AppLocalizations.of(context)!.taskActions,
+                    icon: Icon(
+                      Icons.more_vert,
                       color: selected
                           ? TerminalPalette.of(context).background
                           : TerminalPalette.of(context).muted,
-                      fontSize: terminal ? null : 12,
                     ),
-                  ),
-                ),
-              if (completedAt == null &&
-                  !terminal &&
-                  !(task.parentId != null && task.status == TaskStatus.done))
-                IconButton(
-                  tooltip: AppLocalizations.of(context)!.advanceTask,
-                  color: selected
-                      ? TerminalPalette.of(context).background
-                      : _statusColor(context, task.status),
-                  onPressed: () {
-                    ref
-                        .read(workspaceViewModelProvider.notifier)
-                        .selectTask(task.id);
-                    unawaited(
-                      ref
-                          .read(workspaceViewModelProvider.notifier)
-                          .advanceSelectedTask(),
-                    );
-                  },
-                  icon: const Icon(Icons.play_arrow),
-                ),
-              if (!terminal)
-                PopupMenuButton<String>(
-                  tooltip: AppLocalizations.of(context)!.taskActions,
-                  icon: Icon(
-                    Icons.more_vert,
-                    color: selected
-                        ? TerminalPalette.of(context).background
-                        : TerminalPalette.of(context).muted,
-                  ),
-                  onSelected: (action) =>
-                      _handleTaskAction(context, ref, task, action),
-                  itemBuilder: (_) => [
-                    if (task.parentId == null && task.status == TaskStatus.done)
-                      PopupMenuItem(
-                        value: 'revert',
-                        child: Text(
-                          AppLocalizations.of(context)!.reopenInDoing,
+                    onSelected: (action) =>
+                        _handleTaskAction(context, ref, task, action),
+                    itemBuilder: (_) => [
+                      if (task.parentId == null &&
+                          task.status == TaskStatus.done)
+                        PopupMenuItem(
+                          value: 'revert',
+                          child: Text(
+                            AppLocalizations.of(context)!.reopenInDoing,
+                          ),
                         ),
-                      ),
-                    if (task.status != TaskStatus.done &&
-                        depth + 1 < maxTaskDepth)
-                      PopupMenuItem(
-                        value: 'subtask',
-                        child: Text(AppLocalizations.of(context)!.newSubtask),
-                      ),
-                    if (hasChildren)
-                      PopupMenuItem(
-                        value: 'collapse',
-                        child: Text(
-                          task.collapsed
-                              ? AppLocalizations.of(context)!.expandSubtasks
-                              : AppLocalizations.of(context)!.collapseSubtasks,
+                      if (task.status != TaskStatus.done &&
+                          depth + 1 < maxTaskDepth)
+                        PopupMenuItem(
+                          value: 'subtask',
+                          child: Text(AppLocalizations.of(context)!.newSubtask),
                         ),
-                      ),
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Text(AppLocalizations.of(context)!.edit),
-                    ),
-                    if (!hasChildren)
+                      if (hasChildren)
+                        PopupMenuItem(
+                          value: 'collapse',
+                          child: Text(
+                            task.collapsed
+                                ? AppLocalizations.of(context)!.expandSubtasks
+                                : AppLocalizations.of(
+                                    context,
+                                  )!.collapseSubtasks,
+                          ),
+                        ),
                       PopupMenuItem(
-                        value: 'duplicate',
-                        child: Text(AppLocalizations.of(context)!.duplicate),
+                        value: 'edit',
+                        child: Text(AppLocalizations.of(context)!.edit),
                       ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Text(AppLocalizations.of(context)!.delete),
-                    ),
-                  ],
-                ),
-            ],
+                      if (!hasChildren)
+                        PopupMenuItem(
+                          value: 'duplicate',
+                          child: Text(AppLocalizations.of(context)!.duplicate),
+                        ),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Text(AppLocalizations.of(context)!.delete),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -1811,8 +1818,13 @@ class _TaskTitle extends StatefulWidget {
 }
 
 class _TaskTitleState extends State<_TaskTitle> {
+  static const _marqueeSeparator = '  ▢  ';
+  static const _marqueeFrameInterval = Duration(milliseconds: 16);
+
   Timer? _timer;
+  final _marqueeScrollController = ScrollController();
   var _offset = 0;
+  var _marqueeOffset = 0.0;
   var _available = 0;
 
   @override
@@ -1828,35 +1840,55 @@ class _TaskTitleState extends State<_TaskTitle> {
         oldWidget.display != widget.display ||
         oldWidget.speed != widget.speed) {
       _offset = 0;
-      _configureTimer();
+      _marqueeOffset = 0;
+      _configureTimer(resetMarquee: true);
     }
   }
 
-  void _configureTimer() {
+  void _configureTimer({bool resetMarquee = false}) {
     _timer?.cancel();
     if (!widget.selected || _available == 0) return;
-    if (widget.display == LongTitleDisplay.marquee ||
-        widget.display == LongTitleDisplay.slidingWindow) {
-      final stride = widget.display == LongTitleDisplay.slidingWindow
-          ? (_available - 5).clamp(1, _available)
-          : 1;
-      final interval = widget.display == LongTitleDisplay.slidingWindow
-          ? widget.speed * stride
-          : widget.speed;
-      _timer = Timer.periodic(Duration(milliseconds: interval), (_) {
+    if (widget.display == LongTitleDisplay.marquee) {
+      final length = widget.value
+          .replaceAll(RegExp(r'[\r\n]+'), ' ')
+          .characters
+          .length;
+      final cycleWidth =
+          (length + _marqueeSeparator.characters.length) *
+          TerminalMetrics.cell(context);
+      if (resetMarquee) _marqueeOffset = 0;
+      _timer = Timer.periodic(_marqueeFrameInterval, (_) {
         if (!mounted) return;
-        final length = widget.value.characters.length;
-        final last = (length - _available).clamp(0, length);
         setState(() {
-          _offset = _offset >= last ? 0 : (_offset + stride).clamp(0, last);
+          _marqueeOffset =
+              (_marqueeOffset +
+                  _marqueeFrameInterval.inMilliseconds *
+                      TerminalMetrics.cell(context) /
+                      widget.speed) %
+              cycleWidth;
         });
+        if (_marqueeScrollController.hasClients) {
+          _marqueeScrollController.jumpTo(_marqueeOffset);
+        }
       });
+      return;
     }
+    if (widget.display != LongTitleDisplay.slidingWindow) return;
+    final stride = (_available - 5).clamp(1, _available);
+    _timer = Timer.periodic(Duration(milliseconds: widget.speed * stride), (_) {
+      if (!mounted) return;
+      final length = widget.value.characters.length;
+      final last = (length - _available).clamp(0, length);
+      setState(() {
+        _offset = _offset >= last ? 0 : (_offset + stride).clamp(0, last);
+      });
+    });
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    _marqueeScrollController.dispose();
     super.dispose();
   }
 
@@ -1877,7 +1909,7 @@ class _TaskTitleState extends State<_TaskTitle> {
         if (_available != available) {
           _available = available;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _configureTimer();
+            if (mounted) _configureTimer(resetMarquee: true);
           });
         }
         if (!widget.selected ||
@@ -1890,15 +1922,26 @@ class _TaskTitleState extends State<_TaskTitle> {
             style: widget.style,
           );
         }
-        final text = widget.display == LongTitleDisplay.slidingWindow
-            ? characters.skip(_offset).take(available).join()
-            : () {
-                final loop = [...characters, ...'   •   '.characters];
-                return List<String>.generate(
-                  available,
-                  (index) => loop[(_offset + index) % loop.length],
-                ).join();
-              }();
+        if (widget.display == LongTitleDisplay.marquee) {
+          final loop = [...characters, ..._marqueeSeparator.characters].join();
+          return SizedBox(
+            width: constraints.maxWidth,
+            child: SingleChildScrollView(
+              key: const ValueKey('marquee-title'),
+              controller: _marqueeScrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const NeverScrollableScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(loop, maxLines: 1, softWrap: false, style: widget.style),
+                  Text(loop, maxLines: 1, softWrap: false, style: widget.style),
+                ],
+              ),
+            ),
+          );
+        }
+        final text = characters.skip(_offset).take(available).join();
         return Text(
           text,
           maxLines: 1,

@@ -543,6 +543,9 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
       }
     }
     if (owner == null) return;
+    if (state.currentListId == owner.id && state.selectedTaskId == taskId) {
+      return;
+    }
     state = state.copyWith(currentListId: owner.id, selectedTaskId: taskId);
     _scheduleDeviceSave();
   }

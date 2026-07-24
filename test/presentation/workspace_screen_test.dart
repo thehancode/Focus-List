@@ -49,6 +49,42 @@ void main() {
     debugDefaultTargetPlatformOverride = null;
   });
 
+  testWidgets('pointer-down selects a terminal task before tap resolution', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final list = _listsWithManyTasks(
+      TaskStatus.pending,
+      multipleLists: false,
+    ).first;
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(const _Settings()),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final secondTask = find.ancestor(
+      of: find.text('Task 1'),
+      matching: find.byWidgetPredicate(
+        (widget) => widget is Semantics && widget.properties.button == true,
+      ),
+    );
+    final gesture = await tester.startGesture(tester.getCenter(secondTask));
+    await tester.pump();
+
+    expect(tester.widget<Semantics>(secondTask).properties.selected, isTrue);
+    await gesture.up();
+    await tester.pump(const Duration(milliseconds: 50));
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets(
     'terminal workspace remains usable in a constrained browser size',
     (tester) async {
@@ -381,6 +417,60 @@ void main() {
     // bodyMedium is 14 px, scaled by 28 / 16 to 24.5 px. A normalized
     // two-line terminal paragraph should therefore occupy about 49 px.
     expect(tester.getSize(taskText).height, inInclusiveRange(49, 51));
+    expect(tester.takeException(), isNull);
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  testWidgets('marquee loops through a visible cycle marker', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await tester.binding.setSurfaceSize(const Size(420, 360));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final now = DateTime.utc(2026, 1, 1);
+    final task = Task(
+      id: 'task-1',
+      title:
+          'A long task title that must scroll continuously through its cycle marker before it starts again',
+      status: TaskStatus.pending,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+      daily: false,
+      completionHistory: const [],
+    );
+    final list = TaskList(
+      schemaVersion: currentSchemaVersion,
+      id: 'list-1',
+      name: 'Tasks',
+      createdAt: now,
+      tasks: [task],
+    );
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          deviceStateRepositoryProvider.overrideWithValue(const _DeviceState()),
+          taskListRepositoryProvider.overrideWithValue(_Lists([list])),
+          settingsRepositoryProvider.overrideWithValue(
+            const _Settings(
+              AppSettings(
+                longTitleDisplay: LongTitleDisplay.marquee,
+                marqueeSpeedMs: minMarqueeSpeedMs,
+              ),
+            ),
+          ),
+        ],
+        child: const FocusListApp(),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 20));
+
+    final marquee = find.byKey(const ValueKey('marquee-title'));
+    expect(marquee, findsOneWidget);
+    final scrollView = tester.widget<SingleChildScrollView>(marquee);
+    final initialOffset = scrollView.controller!.offset;
+    await tester.pump(const Duration(milliseconds: minMarqueeSpeedMs));
+    final movedOffset = scrollView.controller!.offset;
+    expect(movedOffset, greaterThan(initialOffset));
     expect(tester.takeException(), isNull);
     debugDefaultTargetPlatformOverride = null;
   });
