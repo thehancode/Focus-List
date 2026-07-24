@@ -188,6 +188,7 @@ extension WorkspaceStateQueries on WorkspaceState {
       TaskStatus.doing,
       TaskStatus.pending,
       TaskStatus.done,
+      TaskStatus.archived,
     ]).map((task) => task.id).toList(),
     WorkspaceView.focus => visibleTreeTasks(
       currentList,
@@ -451,6 +452,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         if (task.parentId == null &&
             task.daily &&
             task.status != TaskStatus.pending &&
+            task.status != TaskStatus.archived &&
             !isSameLocalDay(task.updatedAt, now)) {
           resetIds.add(task.id);
           resetIds.addAll(taskDescendants(list, task).map((item) => item.id));
@@ -1029,6 +1031,57 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     return success;
   }
 
+  Future<bool> archiveSelectedTask() async {
+    if (state.view != WorkspaceView.list) return false;
+    final list = state.selectedTaskList;
+    final selected = state.selectedTask;
+    if (list == null || selected == null || selected.status == TaskStatus.archived) {
+      return false;
+    }
+    final visibleBefore = state.visibleTaskIds;
+    final selectedIndex = visibleBefore.indexOf(selected.id);
+    final archivedIds = {
+      selected.id,
+      ...taskDescendants(list, selected).map((task) => task.id),
+    };
+    final now = DateTime.now().toUtc();
+    final archivedTasks = [
+      for (final task in list.tasks)
+        if (archivedIds.contains(task.id))
+          task.copyWith(
+            status: TaskStatus.archived,
+            updatedAt: now,
+            clearCompletedAt: true,
+          )
+        else
+          task,
+    ];
+    final success = await _saveList(
+      list.copyWith(tasks: archivedTasks),
+      success: '${selected.status.label} → Archived',
+      animationTaskId: selected.id,
+    );
+    if (!success) return false;
+
+    final nextId = _nextListTaskId(visibleBefore, selectedIndex, archivedIds);
+    if (nextId != null) selectTask(nextId);
+    return true;
+  }
+
+  String? _nextListTaskId(
+    List<String> ids,
+    int selectedIndex,
+    Set<String> archivedIds,
+  ) {
+    if (ids.isEmpty) return null;
+    final start = selectedIndex < 0 ? 0 : selectedIndex + 1;
+    for (var offset = 0; offset < ids.length; offset++) {
+      final id = ids[(start + offset) % ids.length];
+      if (!archivedIds.contains(id)) return id;
+    }
+    return ids[(start - 1 + ids.length) % ids.length];
+  }
+
   String? _nextPendingTaskId(String completedTaskId) {
     final ids = state.visibleTaskIds;
     if (ids.isEmpty) return null;
@@ -1295,7 +1348,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
 
     if (search.allLists) {
       for (final list in state.lists) {
-        addStatuses(list, const [TaskStatus.doing, TaskStatus.pending]);
+    addStatuses(list, const [TaskStatus.doing, TaskStatus.pending]);
       }
       for (final list in state.lists) {
         addStatuses(list, const [TaskStatus.done]);
@@ -1313,11 +1366,17 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
         }
       }
     }
-    addStatuses(list, const [
-      TaskStatus.doing,
-      TaskStatus.pending,
-      TaskStatus.done,
-    ]);
+    addStatuses(
+      list,
+      state.view == WorkspaceView.list
+          ? const [
+              TaskStatus.doing,
+              TaskStatus.pending,
+              TaskStatus.done,
+              TaskStatus.archived,
+            ]
+          : const [TaskStatus.doing, TaskStatus.pending, TaskStatus.done],
+    );
     return result;
   }
 

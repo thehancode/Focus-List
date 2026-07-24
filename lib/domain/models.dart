@@ -5,7 +5,7 @@ const int defaultMarqueeSpeedMs = 180;
 const int minMarqueeSpeedMs = 50;
 const int maxMarqueeSpeedMs = 1000;
 
-enum TaskStatus { pending, doing, done }
+enum TaskStatus { pending, doing, done, archived }
 
 enum TaskTag { spade, heart, club, diamond }
 
@@ -35,18 +35,21 @@ extension TaskStatusX on TaskStatus {
     TaskStatus.pending => 'Pending',
     TaskStatus.doing => 'Doing',
     TaskStatus.done => 'Done',
+    TaskStatus.archived => 'Archived',
   };
 
   TaskStatus get next => switch (this) {
     TaskStatus.pending => TaskStatus.doing,
     TaskStatus.doing => TaskStatus.done,
     TaskStatus.done => TaskStatus.pending,
+    TaskStatus.archived => TaskStatus.pending,
   };
 
   static TaskStatus fromWireName(Object? value) => switch (value) {
     'pending' => TaskStatus.pending,
     'doing' => TaskStatus.doing,
     'done' => TaskStatus.done,
+    'archived' => TaskStatus.archived,
     _ => throw FormatException('Unknown task status: $value'),
   };
 }

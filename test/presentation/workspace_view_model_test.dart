@@ -311,6 +311,32 @@ void main() {
     expect(container.read(workspaceViewModelProvider).selectedTaskId, 'second');
   });
 
+  test('archiving stores the status and selects the next list task', () async {
+    final list = _list('tasks', 'Tasks', [
+      _task('first', 'First'),
+      _task('second', 'Second'),
+      _task('third', 'Third'),
+    ]);
+    final repository = _TaskLists([list]);
+    final container = _container([list], repository: repository);
+    addTearDown(container.dispose);
+    final vm = await _ready(container);
+
+    expect(await vm.archiveSelectedTask(), isTrue);
+    expect(repository.lists.single.tasks.first.status, TaskStatus.archived);
+    expect(container.read(workspaceViewModelProvider).selectedTaskId, 'second');
+    expect(
+      container.read(workspaceViewModelProvider).visibleTaskIds,
+      ['second', 'third', 'first'],
+    );
+
+    vm.toggleMultiView();
+    expect(container.read(workspaceViewModelProvider).visibleTaskIds, [
+      'second',
+      'third',
+    ]);
+  });
+
   test(
     'search includes collapsed descendants and retains selected match',
     () async {

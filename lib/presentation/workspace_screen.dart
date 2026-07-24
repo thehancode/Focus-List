@@ -145,7 +145,12 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       return KeyEventResult.handled;
     }
     if (key == LogicalKeyboardKey.space) {
-      if (_grabbed) {
+      if (HardwareKeyboard.instance.isShiftPressed) {
+        _releaseGrab();
+        if (ref.read(workspaceViewModelProvider).view == WorkspaceView.list) {
+          unawaited(vm.archiveSelectedTask());
+        }
+      } else if (_grabbed) {
         unawaited(vm.completeSelectedTask());
         _releaseGrab();
       } else {
@@ -1079,6 +1084,7 @@ class _ListContent extends StatelessWidget {
           TaskStatus.doing,
           TaskStatus.pending,
           TaskStatus.done,
+          TaskStatus.archived,
         ])
           _TaskSection(
             state: state,
@@ -1509,6 +1515,7 @@ class _TaskRow extends ConsumerWidget {
     final selected = task.id == state.selectedTaskId;
     final visibleTaskIds = selected ? state.visibleTaskIds : const <String>[];
     final done = task.status == TaskStatus.done;
+    final archived = task.status == TaskStatus.archived;
     final animated = task.id == state.animatedTaskId;
     final highlighted = state.highlightedTaskIds.contains(task.id);
     final search = state.search;
@@ -1524,11 +1531,11 @@ class _TaskRow extends ConsumerWidget {
       style: TextStyle(
         color: selected
             ? TerminalPalette.of(context).background
-            : done
+            : done || archived
             ? TerminalPalette.of(context).muted
             : TerminalPalette.of(context).text,
         fontWeight: selected ? FontWeight.bold : FontWeight.normal,
-        decoration: done ? TextDecoration.lineThrough : null,
+        decoration: done || archived ? TextDecoration.lineThrough : null,
       ),
     );
     final row = Semantics(
@@ -3014,6 +3021,7 @@ String _statusLabel(TaskStatus status, AppLocalizations strings) =>
       TaskStatus.pending => strings.pending,
       TaskStatus.doing => strings.doing,
       TaskStatus.done => strings.done,
+      TaskStatus.archived => strings.archived,
     };
 
 String _languageLabel(String localeName) =>
@@ -3038,12 +3046,14 @@ String _statusIcon(TaskStatus status) => switch (status) {
   TaskStatus.pending => '◌',
   TaskStatus.doing => '●',
   TaskStatus.done => '✓',
+  TaskStatus.archived => '×',
 };
 
 Color _statusColor(BuildContext context, TaskStatus status) => switch (status) {
   TaskStatus.pending => TerminalPalette.of(context).pending,
   TaskStatus.doing => TerminalPalette.of(context).doing,
   TaskStatus.done => TerminalPalette.of(context).done,
+  TaskStatus.archived => TerminalPalette.of(context).muted,
 };
 
 String _localStamp(DateTime value) {

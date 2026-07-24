@@ -132,6 +132,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get done => 'Hecha';
 
   @override
+  String get archived => 'Archived';
+
+  @override
   String get noDoingTasks => 'No hay tareas en curso';
 
   @override
