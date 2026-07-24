@@ -321,6 +321,7 @@ class TaskList {
     required this.name,
     required this.createdAt,
     required List<Task> tasks,
+    this.sortIndex,
   }) : tasks = UnmodifiableListView<Task>(tasks);
 
   final int schemaVersion;
@@ -328,13 +329,20 @@ class TaskList {
   final String name;
   final DateTime createdAt;
   final UnmodifiableListView<Task> tasks;
+  final int? sortIndex;
 
-  TaskList copyWith({String? name, List<Task>? tasks}) => TaskList(
+  TaskList copyWith({
+    String? name,
+    List<Task>? tasks,
+    int? sortIndex,
+    bool clearSortIndex = false,
+  }) => TaskList(
     schemaVersion: schemaVersion,
     id: id,
     name: name ?? this.name,
     createdAt: createdAt,
     tasks: tasks ?? this.tasks,
+    sortIndex: clearSortIndex ? null : (sortIndex ?? this.sortIndex),
   );
 
   Map<String, Object?> toJson() => {
@@ -342,6 +350,7 @@ class TaskList {
     'id': id,
     'name': name,
     'created_at': createdAt.toUtc().toIso8601String(),
+    if (sortIndex != null) 'sort_index': sortIndex,
     'tasks': tasks.map((task) => task.toJson()).toList(growable: false),
   };
 
@@ -352,6 +361,10 @@ class TaskList {
     id: _string(json['id'], 'task-list.id'),
     name: _string(json['name'], 'task-list.name'),
     createdAt: _date(json['created_at'], 'task-list.created_at'),
+    sortIndex: _optionalNonNegativeInt(
+      json['sort_index'],
+      'task-list.sort_index',
+    ),
     tasks:
         (json['tasks'] as List<Object?>? ??
                 (throw const FormatException('task-list tasks is missing')))
@@ -597,6 +610,14 @@ DateTime _date(Object? value, String field) {
 String _string(Object? value, String field) {
   if (value is! String || value.isEmpty) {
     throw FormatException('$field must be a non-empty string');
+  }
+  return value;
+}
+
+int? _optionalNonNegativeInt(Object? value, String field) {
+  if (value == null) return null;
+  if (value is! int || value < 0) {
+    throw FormatException('$field must be a non-negative integer');
   }
   return value;
 }

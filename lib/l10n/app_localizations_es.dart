@@ -293,6 +293,12 @@ class AppLocalizationsEs extends AppLocalizations {
       'Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.';
 
   @override
+  String get taskWasCopied => 'Se copió la tarea';
+
+  @override
+  String get selectionWasCopied => 'Se copió la selección';
+
+  @override
   String get rewardGreatWork => '¡Gran trabajo!';
 
   @override
@@ -663,6 +669,12 @@ class AppLocalizationsEs419 extends AppLocalizationsEs {
       'Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.';
 
   @override
+  String get taskWasCopied => 'Se copió la tarea';
+
+  @override
+  String get selectionWasCopied => 'Se copió la selección';
+
+  @override
   String get rewardGreatWork => '¡Gran trabajo!';
 
   @override
@@ -1031,6 +1043,12 @@ class AppLocalizationsEsEs extends AppLocalizationsEs {
   @override
   String get tipCopy =>
       'Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.';
+
+  @override
+  String get taskWasCopied => 'Se copió la tarea';
+
+  @override
+  String get selectionWasCopied => 'Se copió la selección';
 
   @override
   String get rewardGreatWork => '¡Gran trabajo!';

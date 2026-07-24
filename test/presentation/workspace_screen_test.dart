@@ -1241,6 +1241,7 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
     expect(clipboardText, 'Swipe me');
+    expect(find.textContaining('Task was copied'), findsOneWidget);
 
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
     await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
@@ -1249,6 +1250,14 @@ void main() {
     await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
     await tester.pump();
     expect(clipboardText, 'Swipe me ▲');
+    expect(find.textContaining('Selection was copied'), findsOneWidget);
+
+    await tester.tap(find.text('Swipe me'));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Swipe me'));
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(clipboardText, 'Swipe me');
+    expect(find.textContaining('Task was copied'), findsOneWidget);
     debugDefaultTargetPlatformOverride = null;
   });
 

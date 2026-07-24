@@ -136,6 +136,15 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
       unawaited(_showTaskEditor(subtask: true));
       return KeyEventResult.handled;
     }
+    if (HardwareKeyboard.instance.isShiftPressed &&
+        (key == LogicalKeyboardKey.arrowLeft ||
+            key == LogicalKeyboardKey.arrowRight)) {
+      _releaseGrab();
+      unawaited(
+        vm.reorderCurrentList(key == LogicalKeyboardKey.arrowLeft ? -1 : 1),
+      );
+      return KeyEventResult.handled;
+    }
     if (key == LogicalKeyboardKey.arrowLeft) {
       vm.cycleList(-1);
       return KeyEventResult.handled;
@@ -238,19 +247,24 @@ class _WorkspaceScreenState extends ConsumerState<WorkspaceScreen>
   Future<void> _copySelectedTitle() async {
     final task = ref.read(workspaceViewModelProvider).selectedTask;
     if (task == null) return;
+    final message = AppLocalizations.of(context)!.taskWasCopied;
     await Clipboard.setData(ClipboardData(text: task.title));
+    ref
+        .read(workspaceViewModelProvider.notifier)
+        .showNotice(message);
   }
 
   Future<void> _copyCurrentSection() async {
     final state = ref.read(workspaceViewModelProvider);
     final section = selectedTaskSection(state);
     if (section == null) return;
+    final message = AppLocalizations.of(context)!.selectionWasCopied;
     await Clipboard.setData(
       ClipboardData(text: sectionAsIndentedText(section)),
     );
-    ref
-        .read(workspaceViewModelProvider.notifier)
-        .highlightTasks(section.tasks.map((task) => task.id));
+    final vm = ref.read(workspaceViewModelProvider.notifier);
+    vm.highlightTasks(section.tasks.map((task) => task.id));
+    vm.showNotice(message);
   }
 
   Future<void> _showTaskEditor({
@@ -1557,8 +1571,11 @@ class _TaskRow extends ConsumerWidget {
           onTap: () =>
               ref.read(workspaceViewModelProvider.notifier).selectTask(task.id),
           onDoubleTap: () async {
-            ref.read(workspaceViewModelProvider.notifier).selectTask(task.id);
+            final vm = ref.read(workspaceViewModelProvider.notifier);
+            final message = AppLocalizations.of(context)!.taskWasCopied;
+            vm.selectTask(task.id);
             await Clipboard.setData(ClipboardData(text: task.title));
+            vm.showNotice(message);
           },
           borderRadius: terminal ? BorderRadius.zero : BorderRadius.circular(5),
           child: AnimatedContainer(

@@ -507,6 +507,15 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     name: name,
     createdAt: DateTime.now().toUtc(),
     tasks: const [],
+    sortIndex:
+        state.lists.isNotEmpty &&
+            state.lists.every((list) => list.sortIndex != null)
+        ? state.lists.fold<int>(
+                -1,
+                (highest, list) => max(highest, list.sortIndex!),
+              ) +
+              1
+        : null,
   );
 
   Task _newTask(
@@ -531,6 +540,8 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
   }
 
   void dismissNotice() => state = state.copyWith(clearNotice: true);
+
+  void showNotice(String message) => _showNotice(NoticeState(message));
 
   void reportBackgroundUnavailable() => _showNotice(
     const NoticeState('Background image is unavailable', error: true),
@@ -582,6 +593,40 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     );
     final target = (current + direction) % state.lists.length;
     selectList(state.lists[target].id);
+  }
+
+  Future<bool> reorderCurrentList(int direction) async {
+    if (direction == 0 || state.lists.length < 2) return false;
+    final current = state.lists.indexWhere(
+      (list) => list.id == state.currentListId,
+    );
+    if (current < 0) return false;
+    final target = (current + direction)
+        .clamp(0, state.lists.length - 1)
+        .toInt();
+    if (target == current) return false;
+
+    final reordered = state.lists.toList(growable: true);
+    final moved = reordered.removeAt(current);
+    reordered.insert(target, moved);
+    final normalized = [
+      for (var index = 0; index < reordered.length; index++)
+        reordered[index].copyWith(sortIndex: index),
+    ];
+    final before = _captureHistory();
+    try {
+      await _lists.commit(TaskListChangeSet(upserts: normalized));
+      state = state.copyWith(
+        lists: normalized,
+        notice: const NoticeState('List reordered'),
+      );
+      _expireNotice(const Duration(seconds: 2));
+      _pushHistory(before);
+      _scheduleDeviceSave();
+      return true;
+    } on Object catch (error) {
+      return _error('List reorder failed: $error');
+    }
   }
 
   void toggleMultiView() {
@@ -1035,7 +1080,9 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
     if (state.view != WorkspaceView.list) return false;
     final list = state.selectedTaskList;
     final selected = state.selectedTask;
-    if (list == null || selected == null || selected.status == TaskStatus.archived) {
+    if (list == null ||
+        selected == null ||
+        selected.status == TaskStatus.archived) {
       return false;
     }
     final visibleBefore = state.visibleTaskIds;
@@ -1348,7 +1395,7 @@ class WorkspaceViewModel extends Notifier<WorkspaceState> {
 
     if (search.allLists) {
       for (final list in state.lists) {
-    addStatuses(list, const [TaskStatus.doing, TaskStatus.pending]);
+        addStatuses(list, const [TaskStatus.doing, TaskStatus.pending]);
       }
       for (final list in state.lists) {
         addStatuses(list, const [TaskStatus.done]);

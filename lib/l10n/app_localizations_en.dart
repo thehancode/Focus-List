@@ -73,7 +73,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get keyboardShortcutsHelp =>
-      '↑/↓ or J/K   Move selection\n←/→   Switch task lists\nSpace then F   Advance status\nSpace then Space   Complete subtree\nShift+Space   Archive task\nSpace then ↑/↓   Reorder task/subtree\nN / Tab / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nW / Shift+W   Cycle first / second tag\nCtrl+C   Copy task title\nCtrl+Shift+C   Copy current section\nCtrl+F or /   Search\nCtrl+Z   Undo\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit';
+      '↑/↓ or J/K   Move selection\n←/→   Switch task lists\nShift+←/→   Reorder task lists\nSpace then F   Advance status\nSpace then Space   Complete subtree\nShift+Space   Archive task\nSpace then ↑/↓   Reorder task/subtree\nN / Tab / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nW / Shift+W   Cycle first / second tag\nCtrl+C   Copy task title\nCtrl+Shift+C   Copy current section\nCtrl+F or /   Search\nCtrl+Z   Undo\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit';
 
   @override
   String get couldNotLoad => 'Could not load Focus List';
@@ -289,6 +289,12 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tipCopy =>
       'Ctrl+C copies one title; Ctrl+Shift+C copies its section.';
+
+  @override
+  String get taskWasCopied => 'Task was copied';
+
+  @override
+  String get selectionWasCopied => 'Selection was copied';
 
   @override
   String get rewardGreatWork => 'Great work!';

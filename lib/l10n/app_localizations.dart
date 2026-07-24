@@ -223,7 +223,7 @@ abstract class AppLocalizations {
   /// Multiline desktop shortcut reference. Keep key glyphs and line breaks.
   ///
   /// In en, this message translates to:
-  /// **'↑/↓ or J/K   Move selection\n←/→   Switch task lists\nSpace then F   Advance status\nSpace then Space   Complete subtree\nShift+Space   Archive task\nSpace then ↑/↓   Reorder task/subtree\nN / Tab / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nW / Shift+W   Cycle first / second tag\nCtrl+C   Copy task title\nCtrl+Shift+C   Copy current section\nCtrl+F or /   Search\nCtrl+Z   Undo\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
+  /// **'↑/↓ or J/K   Move selection\n←/→   Switch task lists\nShift+←/→   Reorder task lists\nSpace then F   Advance status\nSpace then Space   Complete subtree\nShift+Space   Archive task\nSpace then ↑/↓   Reorder task/subtree\nN / Tab / E / D / X   New, subtask, edit, duplicate, delete\nH   Collapse / expand subtasks\nW / Shift+W   Cycle first / second tag\nCtrl+C   Copy task title\nCtrl+Shift+C   Copy current section\nCtrl+F or /   Search\nCtrl+Z   Undo\nCtrl+A   Multi view\nCtrl+N   New list\nF2 / Ctrl+R   Rename list\nCtrl+X   Delete list\nC   Doing focus\nV   Completed history\nG   Settings\nS   Sound\nQ   Quit'**
   String get keyboardShortcutsHelp;
 
   /// Fallback workspace loading error.
@@ -615,6 +615,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Ctrl+C copies one title; Ctrl+Shift+C copies its section.'**
   String get tipCopy;
+
+  /// Status message shown after copying a task title.
+  ///
+  /// In en, this message translates to:
+  /// **'Task was copied'**
+  String get taskWasCopied;
+
+  /// Status message shown after copying a task section.
+  ///
+  /// In en, this message translates to:
+  /// **'Selection was copied'**
+  String get selectionWasCopied;
 
   /// Brief task-completion celebration.
   ///

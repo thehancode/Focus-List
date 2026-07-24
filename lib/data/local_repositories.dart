@@ -50,7 +50,12 @@ class LocalTaskListRepository implements TaskListRepository {
       }
     }
 
+    final hasPersistedOrder = loaded.every((list) => list.sortIndex != null);
     loaded.sort((a, b) {
+      if (hasPersistedOrder) {
+        final order = a.sortIndex!.compareTo(b.sortIndex!);
+        if (order != 0) return order;
+      }
       final created = a.createdAt.compareTo(b.createdAt);
       return created != 0 ? created : a.id.compareTo(b.id);
     });

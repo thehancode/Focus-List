@@ -85,6 +85,8 @@
   "tipSubtasks": "Pulsa Tab para añadir una subtarea a la tarea seleccionada.",
   "tipSearch": "Pulsa Ctrl+F o / para buscar tareas.",
   "tipCopy": "Ctrl+C copia un título; Ctrl+Mayús+C copia su sección.",
+  "taskWasCopied": "Se copió la tarea",
+  "selectionWasCopied": "Se copió la selección",
   "rewardGreatWork": "¡Gran trabajo!",
   "rewardNicelyDone": "¡Bien hecho!",
   "rewardKeepGoing": "¡Sigue así!",
